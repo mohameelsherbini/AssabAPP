@@ -10,6 +10,8 @@ import 'package:assab/core/widgets/app_loading_widget.dart';
 import 'package:assab/core/widgets/app_local_failure.dart';
 import 'package:assab/core/widgets/custom_text_button.dart';
 import 'package:assab/core/widgets/time_lines_view.dart';
+import 'package:assab/features/custody/data/custody_receipt_action.dart';
+import 'package:dio/dio.dart';
 import 'package:assab/features/custody/presentation/cubit/get_custody_details/get_custody_details_cubit.dart';
 import 'package:assab/features/custody/presentation/widgets/custody_app_bar.dart';
 import 'package:flutter/material.dart';
@@ -178,6 +180,15 @@ class _CustodyRequestDetailsScreen extends StatelessWidget {
                             },
                           ),
                         ),
+                        if (userTypeStrategy is BranchManagerUserStrategy &&
+                            getCustodyDetailsState
+                                .details
+                                .data
+                                .canConfirmReceipt)
+                          _ConfirmReceiptButton(
+                            requestId: requestId,
+                            onConfirmed: () => _getRequestDetails(context),
+                          ),
                       ],
                     );
                   }
@@ -194,4 +205,73 @@ class _CustodyRequestDetailsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ConfirmReceiptButton extends StatefulWidget {
+  const _ConfirmReceiptButton({
+    required this.requestId,
+    required this.onConfirmed,
+  });
+
+  final String requestId;
+  final VoidCallback onConfirmed;
+
+  @override
+  State<_ConfirmReceiptButton> createState() => _ConfirmReceiptButtonState();
+}
+
+class _ConfirmReceiptButtonState extends State<_ConfirmReceiptButton> {
+  bool _busy = false;
+
+  Future<void> _confirm() async {
+    final agreed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تأكيد استلام التغذية'),
+        content: const Text(
+          'هل استلمت مبلغ التغذية فعليًا؟ سيُضاف إلى عهدة الفرع بعد التأكيد.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('تأكيد الاستلام'),
+          ),
+        ],
+      ),
+    );
+    if (agreed != true || !mounted || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await CustodyReceiptAction(getIt<Dio>()).confirm(widget.requestId);
+      if (!mounted) return;
+      widget.onConfirmed();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تأكيد الاستلام وتحديث عهدة الفرع')),
+      );
+    } on DioException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تعذر تأكيد الاستلام. حدّث الطلب وتحقق من حالة التحويل.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 12),
+    child: FilledButton(
+      onPressed: _busy ? null : _confirm,
+      child: Text(_busy ? 'جارٍ التأكيد...' : 'تأكيد استلام التغذية'),
+    ),
+  );
 }
