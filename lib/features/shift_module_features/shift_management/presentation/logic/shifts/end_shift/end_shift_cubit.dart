@@ -123,11 +123,66 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
   String? _candidatesError;
   int _candidateRequestId = 0;
   double _pendingIncomingCash = 0.0;
+  bool _isPendingIncomingCashValid = true;
+  String? _pendingIncomingCashError;
 
   double get pendingIncomingCash => _pendingIncomingCash;
+  bool get isPendingIncomingCashValid => _isPendingIncomingCashValid;
+  String? get pendingIncomingCashError => _pendingIncomingCashError;
+
   void updatePendingIncomingCash(double value) {
-    _pendingIncomingCash = value >= 0 ? value : 0.0;
-    _previewStale = true;
+    final normalized = value >= 0 ? value : 0.0;
+    _isPendingIncomingCashValid = true;
+    _pendingIncomingCashError = null;
+    if (_pendingIncomingCash != normalized) {
+      _pendingIncomingCash = normalized;
+      invalidatePreview();
+    }
+  }
+
+  void validateAndSetPendingIncomingCash(
+    String? rawInput, {
+    bool isArabic = false,
+  }) {
+    if (rawInput == null || rawInput.trim().isEmpty) {
+      _isPendingIncomingCashValid = true;
+      _pendingIncomingCashError = null;
+      if (_pendingIncomingCash != 0.0) {
+        _pendingIncomingCash = 0.0;
+        invalidatePreview();
+      }
+      return;
+    }
+
+    final trimmed = rawInput.trim();
+    final regex = RegExp(r'^\d+(\.\d{1,2})?$');
+    if (!regex.hasMatch(trimmed)) {
+      _isPendingIncomingCashValid = false;
+      _pendingIncomingCashError = isArabic
+          ? 'مبلغ غير صحيح. أدخل قيمة غير سالبة بالريال حتى منزلتين عشريتين.'
+          : 'Invalid amount. Enter non-negative SAR with up to 2 decimal places.';
+      invalidatePreview();
+      emit(EndShiftPreviewInvalidated());
+      return;
+    }
+
+    final parsed = double.tryParse(trimmed);
+    if (parsed == null || parsed < 0) {
+      _isPendingIncomingCashValid = false;
+      _pendingIncomingCashError = isArabic
+          ? 'مبلغ غير صحيح'
+          : 'Invalid amount';
+      invalidatePreview();
+      emit(EndShiftPreviewInvalidated());
+      return;
+    }
+
+    _isPendingIncomingCashValid = true;
+    _pendingIncomingCashError = null;
+    if (_pendingIncomingCash != parsed) {
+      _pendingIncomingCash = parsed;
+      invalidatePreview();
+    }
   }
 
   double? get countedCash => _countedCash;
@@ -154,6 +209,7 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
   }
 
   bool get canProceedToEndShift {
+    if (!_isPendingIncomingCashValid) return false;
     if (_countedCash == null) return false;
     if (_previewStale || _previewData == null) return false;
     if (_isPreviewLoading || _isSubmitting) return false;
@@ -344,6 +400,17 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
   }
 
   Future<bool> fetchCashReconciliationPreview() async {
+    if (!_isPendingIncomingCashValid) {
+      emit(
+        EndShiftPreviewFailure(
+          _createValidationFailure(
+            _pendingIncomingCashError ?? 'Invalid pending incoming cash amount',
+          ),
+        ),
+      );
+      return false;
+    }
+
     if (_countedCash == null) {
       emit(
         EndShiftPreviewFailure(
@@ -543,6 +610,17 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
   }) async {
     if (_isSubmitting) return;
 
+    if (!_isPendingIncomingCashValid) {
+      emit(
+        EndShiftFailure(
+          _createValidationFailure(
+            _pendingIncomingCashError ?? 'Invalid pending incoming cash amount',
+          ),
+        ),
+      );
+      return;
+    }
+
     if (_countedCash == null) {
       emit(
         EndShiftFailure(
@@ -647,6 +725,17 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
   Future<void> endShitWithHandOver(EndShiftRequestWithHandOver request) async {
     if (_isSubmitting) return;
 
+    if (!_isPendingIncomingCashValid) {
+      emit(
+        EndShiftFailure(
+          _createValidationFailure(
+            _pendingIncomingCashError ?? 'Invalid pending incoming cash amount',
+          ),
+        ),
+      );
+      return;
+    }
+
     if (_countedCash == null) {
       emit(
         EndShiftFailure(
@@ -716,6 +805,8 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
       countedCash: _countedCash!,
       shortageAllocations: _shortageAllocations,
       allocationReason: _allocationReason,
+      pendingIncomingCash: request.pendingIncomingCash ??
+          (_pendingIncomingCash > 0 ? _pendingIncomingCash : null),
       posReceipt: request.posReceipt,
       nextCashierId: request.nextCashierId,
       handoverAmount: request.handoverAmount,
