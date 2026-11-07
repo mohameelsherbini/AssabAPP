@@ -143,10 +143,11 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
             .map((a) => '${a.aggregatorId}:${a.amount.toStringAsFixed(2)}')
             .toList()
           ..sort();
-    return '$_countedCash:${_totalSales.toStringAsFixed(2)}:${_cardPayments.toStringAsFixed(2)}:${aggList.join(',')}';
+    return '$_countedCash:${_totalSales.toStringAsFixed(2)}:${_cardPayments.toStringAsFixed(2)}:${(_declaredPendingIncomingCash ?? 0.0).toStringAsFixed(2)}:${aggList.join(',')}';
   }
 
   bool get canProceedToEndShift {
+    if (_hasInvalidPendingIncomingCash) return false;
     if (_countedCash == null) return false;
     if (_previewStale || _previewData == null) return false;
     if (_isPreviewLoading || _isSubmitting) return false;
@@ -228,6 +229,26 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
     if (val is num) return val.toDouble();
     if (val != null) return double.tryParse(val.toString());
     return null;
+  }
+
+  double? _declaredPendingIncomingCash;
+  bool _hasInvalidPendingIncomingCash = false;
+  double get declaredPendingIncomingCash => _declaredPendingIncomingCash ?? 0.0;
+  bool get hasInvalidPendingIncomingCash => _hasInvalidPendingIncomingCash;
+
+  void setPendingIncomingCash(double? value, {bool isInvalid = false}) {
+    if (_declaredPendingIncomingCash != value || _hasInvalidPendingIncomingCash != isInvalid) {
+      _declaredPendingIncomingCash = value;
+      _hasInvalidPendingIncomingCash = isInvalid;
+      invalidatePreview();
+    }
+  }
+
+  double? get pendingIncomingCash {
+    final val = cashReconciliation?['pending_incoming_cash'];
+    if (val is num) return val.toDouble();
+    if (val != null) return double.tryParse(val.toString());
+    return _declaredPendingIncomingCash;
   }
 
   static ApiFailure _createValidationFailure(String message) {
@@ -337,11 +358,30 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
   }
 
   Future<bool> fetchCashReconciliationPreview() async {
+    if (_hasInvalidPendingIncomingCash) {
+      emit(
+        EndShiftPreviewFailure(
+          _createValidationFailure('القيمة المدخلة في النقد المعلق غير صالحة'),
+        ),
+      );
+      return false;
+    }
     if (_countedCash == null) {
       emit(
         EndShiftPreviewFailure(
           _createValidationFailure(
             S().followupCountedCashIsRequiredForReconciliationPreview,
+          ),
+        ),
+      );
+      return false;
+    }
+
+    if ((_declaredPendingIncomingCash ?? 0.0) > (_countedCash ?? 0.0)) {
+      emit(
+        EndShiftPreviewFailure(
+          _createValidationFailure(
+            'النقد الوارد المعلق لا يمكن أن يتجاوز النقد الفعلي المعدود بالدرج',
           ),
         ),
       );
@@ -360,6 +400,7 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
       totalSales: _totalSales,
       countedCash: _countedCash!,
       cardPayments: _cardPayments,
+      pendingIncomingCash: _declaredPendingIncomingCash,
       aggregators: _aggregators
           .map((a) => EndShiftAggregatorModel.fromEntity(a))
           .toList(),
@@ -469,14 +510,53 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
     emit(state.copyWith(varianceStrategy: strategy));
   }
 
+  static double? tryParseFinancialAmount(String? text) {
+    if (text == null) return null;
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return null;
+    final sanitized = trimmed
+        .replaceAll('٠', '0')
+        .replaceAll('١', '1')
+        .replaceAll('٢', '2')
+        .replaceAll('٣', '3')
+        .replaceAll('٤', '4')
+        .replaceAll('٥', '5')
+        .replaceAll('٦', '6')
+        .replaceAll('٧', '7')
+        .replaceAll('٨', '8')
+        .replaceAll('٩', '9')
+        .replaceAll('۰', '0')
+        .replaceAll('۱', '1')
+        .replaceAll('۲', '2')
+        .replaceAll('۳', '3')
+        .replaceAll('۴', '4')
+        .replaceAll('۵', '5')
+        .replaceAll('۶', '6')
+        .replaceAll('۷', '7')
+        .replaceAll('۸', '8')
+        .replaceAll('۹', '9')
+        .replaceAll('٫', '.')
+        .replaceAll('،', '')
+        .replaceAll('٬', '')
+        .replaceAll('\u066C', '')
+        .replaceAll(',', '');
+    final parsed = double.tryParse(sanitized);
+    if (parsed == null || parsed < 0) return null;
+    return parsed;
+  }
+
+  static double _parseFinancialAmount(String text) {
+    return tryParseFinancialAmount(text) ?? 0.0;
+  }
+
   String calculateNetSales(String totalSalesText) {
-    final totalSales = int.tryParse(totalSalesText) ?? 0;
+    final totalSales = _parseFinancialAmount(totalSalesText);
     final netSales = totalSales / 1.15;
     return netSales.toStringAsFixed(2);
   }
 
   String calculateNetVal(String totalSalesText) {
-    final totalSales = int.tryParse(totalSalesText) ?? 0;
+    final totalSales = _parseFinancialAmount(totalSalesText);
     final netVal = totalSales - (totalSales / 1.15);
     return netVal.toStringAsFixed(2);
   }
@@ -590,6 +670,26 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
       }
     }
 
+    if (_hasInvalidPendingIncomingCash) {
+      emit(
+        EndShiftFailure(
+          _createValidationFailure('القيمة المدخلة في النقد المعلق غير صالحة'),
+        ),
+      );
+      return;
+    }
+
+    if ((_declaredPendingIncomingCash ?? 0.0) > (_countedCash ?? 0.0)) {
+      emit(
+        EndShiftFailure(
+          _createValidationFailure(
+            'النقد الوارد المعلق لا يمكن أن يتجاوز النقد الفعلي المعدود بالدرج',
+          ),
+        ),
+      );
+      return;
+    }
+
     _isSubmitting = true;
     emit(EndShiftLoading(varianceStrategy: state.varianceStrategy));
 
@@ -598,6 +698,7 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
       cashCollected: _cashCollected,
       cardPayments: _cardPayments,
       countedCash: _countedCash!,
+      pendingIncomingCash: _declaredPendingIncomingCash,
       shortageAllocations: _shortageAllocations,
       allocationReason: _allocationReason,
       aggregators: _aggregators
@@ -609,7 +710,7 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
     );
 
     final result = await runUserIntent(
-      'end:$shiftId:${request.countedCash}:${request.totalSales}:${request.cashCollected}:${request.cardPayments}',
+      'end:$shiftId:${request.countedCash}:${request.totalSales}:${request.cashCollected}:${request.cardPayments}:${request.pendingIncomingCash ?? 0.0}',
       () => _repository.endShift(shiftId: shiftId, endShiftRequest: request),
     );
 
@@ -692,15 +793,37 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
       }
     }
 
+    if (_hasInvalidPendingIncomingCash) {
+      emit(
+        EndShiftFailure(
+          _createValidationFailure('القيمة المدخلة في النقد المعلق غير صالحة'),
+        ),
+      );
+      return;
+    }
+
+    if ((_declaredPendingIncomingCash ?? 0.0) > (_countedCash ?? 0.0)) {
+      emit(
+        EndShiftFailure(
+          _createValidationFailure(
+            'النقد الوارد المعلق لا يمكن أن يتجاوز النقد الفعلي المعدود بالدرج',
+          ),
+        ),
+      );
+      return;
+    }
+
     _isSubmitting = true;
     emit(EndShiftLoading(varianceStrategy: state.varianceStrategy));
 
     // Bind physical count, allocations and allocation reason to the handover request
+
     final boundRequest = EndShiftRequestWithHandOver(
       totalSales: request.totalSales,
       cashCollected: request.cashCollected,
       cardPayments: request.cardPayments,
       countedCash: _countedCash!,
+      pendingIncomingCash: _declaredPendingIncomingCash,
       shortageAllocations: _shortageAllocations,
       allocationReason: _allocationReason,
       posReceipt: request.posReceipt,
@@ -714,7 +837,7 @@ class EndShiftCubit extends SafeCubit<EndShiftState> with UserIntentOwner {
     );
 
     final result = await runUserIntent(
-      'end-with-handover:$shiftId:${boundRequest.countedCash}:${boundRequest.nextCashierId}:${boundRequest.handoverAmount}:${boundRequest.totalSales}',
+      'end-with-handover:$shiftId:${boundRequest.countedCash}:${boundRequest.nextCashierId}:${boundRequest.handoverAmount}:${boundRequest.totalSales}:${boundRequest.pendingIncomingCash ?? 0.0}',
       () => _repository.endShiftWithHandOver(shiftId, boundRequest),
     );
 
