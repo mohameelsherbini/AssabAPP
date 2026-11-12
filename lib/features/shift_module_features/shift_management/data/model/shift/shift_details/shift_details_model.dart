@@ -27,7 +27,7 @@ part 'shift_details_model.g.dart';
 //   final double? closingBalance;
 //   @JsonKey(name: 'expected_balance')
 //   final String expectedBalance;
-//   final int? variance;
+//   final double? variance;
 //   @JsonKey(name: 'total_sales')
 //   final String totalSales;
 //   @JsonKey(name: 'net_sales')
@@ -115,13 +115,13 @@ class ShiftDetailsModel {
 
   final ShiftInfoDetailsModel shiftInfoDetails;
 
-  final int? openingBalance;
+  final double? openingBalance;
 
-  final int? closingBalance;
+  final double? closingBalance;
 
-  final int? expectedBalance;
+  final double? expectedBalance;
 
-  final int? variance;
+  final double? variance;
 
   final int? totalSales;
 
@@ -143,7 +143,7 @@ class ShiftDetailsModel {
 
   final String? handoverNotes;
 
-  final int? handoverAmount;
+  final double? handoverAmount;
 
   final HandoverStatusModel? handoverStatus;
 
@@ -171,7 +171,7 @@ class ShiftDetailsModel {
 
   final bool? isShiftReassignedToMe;
 
-  final int? cashGiven;
+  final double? cashGiven;
 
   final String? previousCashier;
 
@@ -222,17 +222,19 @@ class ShiftDetailsModel {
   factory ShiftDetailsModel.fromJson(
     Map<String, dynamic> json,
   ) => ShiftDetailsModel(
-    id: json['id'] as String,
-    shiftDate: json['shift_date'] as String,
-    status: ShiftStatusType.fromString(json['status'] as String),
+    id: (json['id'] ?? '').toString(),
+    shiftDate: (json['shift_date'] as String?) ?? '',
+    status: ShiftStatusType.fromString(
+      (json['status'] as String?) ?? 'not_started',
+    ),
     cashier: CashierModel.fromJson(json['cashier'] as Map<String, dynamic>),
     shiftInfoDetails: ShiftInfoDetailsModel.fromJson(
       json['shift'] as Map<String, dynamic>,
     ),
-    openingBalance: JsonValueParser.toInt(json['opening_balance']),
-    closingBalance: JsonValueParser.toInt(json['closing_balance']),
-    expectedBalance: JsonValueParser.toInt(json['expected_balance']),
-    variance: JsonValueParser.toInt(json['variance']),
+    openingBalance: JsonValueParser.toDouble(json['opening_balance']),
+    closingBalance: JsonValueParser.toDouble(json['closing_balance']),
+    expectedBalance: JsonValueParser.toDouble(json['expected_balance']),
+    variance: JsonValueParser.toDouble(json['variance']),
     totalSales: JsonValueParser.toInt(json['total_sales']),
     netSales: JsonValueParser.toInt(json['net_sales']),
     vatAmount: JsonValueParser.toInt(json['vat_amount']),
@@ -243,52 +245,42 @@ class ShiftDetailsModel {
     actualEndTime: json['actual_end_time'] as String?,
     handedOverAt: json['handed_over_at'] as String?,
     handoverNotes: json['handover_notes'] as String?,
-    handoverAmount: JsonValueParser.toInt(json['handover_amount']),
-    handoverStatus: json['handover_status'] == null
-        ? null
-        : HandoverStatusModel.fromJson(
+    handoverAmount: JsonValueParser.toDouble(json['handover_amount']),
+    handoverStatus: json['handover_status'] is Map<String, dynamic>
+        ? HandoverStatusModel.fromJson(
             json['handover_status'] as Map<String, dynamic>,
-          ),
-    handoverDetails: json['handover_details'] == null
-        ? null
-        : HandoverDetailsModel.fromJson(
+          )
+        : null,
+    handoverDetails: json['handover_details'] is Map<String, dynamic>
+        ? HandoverDetailsModel.fromJson(
             json['handover_details'] as Map<String, dynamic>,
-          ),
-    handoverTo: json['handover_to'] == null
-        ? null
-        : HandoverToModel.fromJson(json['handover_to'] as Map<String, dynamic>),
-    handoverApprovedOrRejectedBy:
-        json['handover_approved_or_rejected_by'] == null
-        ? null
-        : HandoverApprovalModel.fromJson(
-            json['handover_approved_or_rejected_by'] as Map<String, dynamic>,
-          ),
-    assignedTo: json['assigned_to'] == null
-        ? null
-        : CashierModel.fromJson(json['assigned_to'] as Map<String, dynamic>),
-    cashFrom: json['cash_from'] == null
-        ? null
-        : AssignedByModel.fromJson(json['cash_from'] as Map<String, dynamic>),
-    nextCashier: json['next_cashier'] == null
-        ? null
-        : CashierModel.fromJson(json['next_cashier'] as Map<String, dynamic>),
+          )
+        : null,
+    handoverTo: HandoverToModel.tryFromJson(json['handover_to']),
+    handoverApprovedOrRejectedBy: HandoverApprovalModel.tryFromJson(
+      json['handover_approved_or_rejected_by'],
+    ),
+    assignedTo: CashierModel.tryFromJson(json['assigned_to']),
+    cashFrom: AssignedByModel.tryFromJson(json['cash_from']),
+    nextCashier: CashierModel.tryFromJson(json['next_cashier']),
     aggregators: (json['sales_breakdown'] as List<dynamic>?)
-        ?.map((e) => SalesBreakDownModel.fromJson(e as Map<String, dynamic>))
+        ?.whereType<Map<String, dynamic>>()
+        .map(SalesBreakDownModel.fromJson)
         .toList(),
-    varianceDetails: json['variance_details'] == null
-        ? null
-        : VarianceDetailsModel.fromJson(
+    varianceDetails: json['variance_details'] is Map<String, dynamic>
+        ? VarianceDetailsModel.fromJson(
             json['variance_details'] as Map<String, dynamic>,
-          ),
-    reassignment: json['reassignment'] == null
-        ? null
-        : ReassignmentModel.fromJson(
+          )
+        : null,
+    reassignment: json['reassignment'] is Map<String, dynamic>
+        ? ReassignmentModel.fromJson(
             json['reassignment'] as Map<String, dynamic>,
-          ),
+          )
+        : null,
     isMidReassign: json['is_mid_reassign'] as bool?,
     canBeAccepted: json['can_be_accepted'] as bool?,
     isShiftReassignedToMe: json['is_shift_reassigned_to_me'] as bool?,
-    cashGiven: JsonValueParser.toInt(json['cash_given']),
+    cashGiven: JsonValueParser.toDouble(json['cash_given']),
     previousCashier: json['previous_cashier'] as String?,
     reassignReason: json['reassign_reason'] as String?,
     varianceReason: json['variance_reason'] as String?,
@@ -379,6 +371,16 @@ class HandoverApprovalModel {
     required this.reviewedAt,
   });
 
+  static HandoverApprovalModel? tryFromJson(Object? raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    final id = raw['id']?.toString().trim();
+    final name = raw['name']?.toString().trim();
+    if ((id == null || id.isEmpty) && (name == null || name.isEmpty)) {
+      return null;
+    }
+    return HandoverApprovalModel.fromJson(raw);
+  }
+
   factory HandoverApprovalModel.fromJson(Map<String, dynamic> json) =>
       _$HandoverApprovalModelFromJson(json);
 
@@ -408,7 +410,7 @@ class HandoverDetailsModel {
   @JsonKey(name: 'handover_time')
   final String? handoverTime;
 
-  @JsonKey(name: 'actioned_by')
+  @JsonKey(name: 'actioned_by', fromJson: AssignedByModel.tryFromJson)
   final AssignedByModel? actionedBy;
 
   HandoverDetailsModel({
@@ -491,6 +493,16 @@ class HandoverToModel {
     required this.email,
   });
 
+  static HandoverToModel? tryFromJson(Object? raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    final id = raw['id']?.toString().trim();
+    final name = raw['name']?.toString().trim();
+    if ((id == null || id.isEmpty) && (name == null || name.isEmpty)) {
+      return null;
+    }
+    return HandoverToModel.fromJson(raw);
+  }
+
   factory HandoverToModel.fromJson(Map<String, dynamic> json) =>
       _$HandoverToModelFromJson(json);
 
@@ -510,6 +522,16 @@ class AssignedByModel {
     required this.name,
     required this.userType,
   });
+
+  static AssignedByModel? tryFromJson(Object? raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    final id = raw['id']?.toString().trim();
+    final name = raw['name']?.toString().trim();
+    if ((id == null || id.isEmpty) && (name == null || name.isEmpty)) {
+      return null;
+    }
+    return AssignedByModel.fromJson(raw);
+  }
 
   factory AssignedByModel.fromJson(Map<String, dynamic> json) =>
       _$AssignedByModelFromJson(json);

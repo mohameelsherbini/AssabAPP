@@ -16,6 +16,18 @@ import 'local_status_code.dart';
 class ApiErrorHandler {
   const ApiErrorHandler._();
 
+  static bool _isNetworkDown(SocketException? socketError) {
+    if (socketError == null) return false;
+    final osCode = socketError.osError?.errorCode;
+    final msg = socketError.message.toLowerCase();
+    return osCode == 100 ||
+        osCode == 101 ||
+        osCode == 50 ||
+        osCode == 51 ||
+        msg.contains('network is unreachable') ||
+        msg.contains('network is down');
+  }
+
   static String _msg(ErrorMessageKey key) => ErrorLocaleResolver.resolve(key);
 
   static ApiFailure handle(Object error, StackTrace stackTrace) {
@@ -29,10 +41,19 @@ class ApiErrorHandler {
       case DioException e:
         failure = _handleDioError(e);
 
-      case SocketException _:
+      case SocketException e:
+        final isDown = _isNetworkDown(e);
         failure = NetworkFailure(
-          error: LocalErrorModel(message: _msg(ErrorMessageKey.noInternet)),
-          icon: CupertinoIcons.wifi_slash,
+          error: LocalErrorModel(
+            message: _msg(
+              isDown
+                  ? ErrorMessageKey.noInternet
+                  : ErrorMessageKey.serverUnreachable,
+            ),
+          ),
+          icon: isDown
+              ? CupertinoIcons.wifi_slash
+              : CupertinoIcons.exclamationmark_circle,
           statusCode: LocalStatusCode.connectionError,
           stackTrace: stackTrace,
         );
@@ -104,9 +125,21 @@ class ApiErrorHandler {
       case DioExceptionType.cancel:
         throw const ApiCancelledException();
       case DioExceptionType.connectionError:
+        final socketError = e.error is SocketException
+            ? e.error as SocketException
+            : null;
+        final isDown = _isNetworkDown(socketError);
         return NetworkFailure(
-          error: DioErrorModel(message: _msg(ErrorMessageKey.noInternet)),
-          icon: CupertinoIcons.wifi_slash,
+          error: DioErrorModel(
+            message: _msg(
+              isDown
+                  ? ErrorMessageKey.noInternet
+                  : ErrorMessageKey.serverUnreachable,
+            ),
+          ),
+          icon: isDown
+              ? CupertinoIcons.wifi_slash
+              : CupertinoIcons.exclamationmark_circle,
           statusCode: LocalStatusCode.connectionError,
           stackTrace: e.stackTrace,
         );
@@ -122,17 +155,33 @@ class ApiErrorHandler {
 
   static ApiFailure _handleResponse(Response? response, StackTrace stackTrace) {
     final statusCode = response?.statusCode ?? 0;
-    final data = response?.data;
+    final rawData = response?.data;
+    final mapData = rawData is Map ? rawData : null;
+    final nestedError = mapData?['error'];
+    final nestedErrorMap = nestedError is Map ? nestedError : null;
+    final rawErrors = mapData?['errors'] ?? nestedErrorMap?['details'];
+    final errorsMap = rawErrors is Map<String, dynamic>
+        ? rawErrors
+        : (rawErrors is Map ? Map<String, dynamic>.from(rawErrors) : null);
 
-    String serverMessage(ErrorMessageKey fallback) =>
-        data?['message']?.toString() ?? _msg(fallback);
+    String serverMessage(ErrorMessageKey fallback) {
+      final topMessage = mapData?['message']?.toString().trim();
+      if (topMessage != null && topMessage.isNotEmpty) {
+        return topMessage;
+      }
+      final nestedMessage = nestedErrorMap?['message']?.toString().trim();
+      if (nestedMessage != null && nestedMessage.isNotEmpty) {
+        return nestedMessage;
+      }
+      return _msg(fallback);
+    }
 
     switch (statusCode) {
       case ApiStatusCode.badRequest:
         return ValidationFailure(
           error: DioErrorModel(
             message: serverMessage(ErrorMessageKey.badRequest),
-            errors: data?['errors'],
+            errors: errorsMap,
           ),
           icon: CupertinoIcons.exclamationmark_circle,
           statusCode: statusCode,
@@ -160,7 +209,7 @@ class ApiErrorHandler {
         return ValidationFailure(
           error: DioErrorModel(
             message: serverMessage(ErrorMessageKey.validationFailed),
-            errors: data?['errors'],
+            errors: errorsMap,
           ),
           icon: CupertinoIcons.exclamationmark_circle,
           statusCode: statusCode,
@@ -176,11 +225,25 @@ class ApiErrorHandler {
           stackTrace: stackTrace,
         );
       case ApiStatusCode.internalServerError:
+      case 502:
       case ApiStatusCode.serviceUnavailable:
+      case 504:
+        final resolvedMessage = serverMessage(ErrorMessageKey.serverError);
+        final lowerMsg = resolvedMessage.toLowerCase();
+        // Supplier auth controller extends BaseController which maps plain
+        // Exception('Invalid credentials') / Exception('Account is inactive')
+        // to HTTP 500 JSON; surface those cleanly as AuthFailure.
+        if (lowerMsg.contains('invalid credentials') ||
+            lowerMsg.contains('account is inactive')) {
+          return AuthFailure(
+            error: DioErrorModel(message: resolvedMessage),
+            icon: CupertinoIcons.lock,
+            statusCode: statusCode,
+            stackTrace: stackTrace,
+          );
+        }
         return ServerFailure(
-          error: DioErrorModel(
-            message: serverMessage(ErrorMessageKey.serverError),
-          ),
+          error: DioErrorModel(message: resolvedMessage),
           icon: CupertinoIcons.antenna_radiowaves_left_right,
           statusCode: statusCode,
           stackTrace: stackTrace,

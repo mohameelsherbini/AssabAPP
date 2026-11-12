@@ -50,8 +50,8 @@ extension ShiftDetailsModelMapper on ShiftDetailsModel {
         endTime: shiftInfoDetails.endTime,
       ),
       shiftInfoDetails: shiftInfoDetails.toEntity(),
-      openingBalance: openingBalance?.toDouble() ?? 0,
-      closingBalance: closingBalance?.toDouble() ?? 0,
+      openingBalance: openingBalance ?? 0,
+      closingBalance: closingBalance ?? 0,
       vatAmount: vatAmount?.toDouble() ?? 0,
       cashCollected: cashCollected?.toDouble() ?? 0,
       handoverStatus: handoverStatus?.toEntity(),
@@ -67,17 +67,17 @@ extension ShiftDetailsModelMapper on ShiftDetailsModel {
       actualEndTime: actualEndTime,
       actualStartTime: actualStartTime,
       handoverNotes: handoverNotes,
-      handoverAmount: handoverAmount?.toDouble() ?? 0,
+      handoverAmount: handoverAmount,
       canBeAccepted: canBeAccepted,
       isShiftReassignedToMe: isShiftReassignedToMe,
       previousCashier: previousCashier,
       reassignedBy: reassignment?.reassignedBy?.name,
       reassignedTo: reassignment?.reassignedTo?.name,
       reassignedFrom: reassignment?.reassignedFrom?.name,
-      expectedBalance: expectedBalance?.toDouble() ?? 0,
+      expectedBalance: expectedBalance ?? 0,
       reassignReason: reassignReason,
       varianceReason: varianceReason,
-      cashGiven: cashGiven?.toDouble() ?? 0,
+      cashGiven: cashGiven,
       isMidReassign: isMidReassign,
       cardPayment: cardPayments?.toDouble() ?? 0,
       deliveryApps:
@@ -92,6 +92,10 @@ extension ShiftDetailsModelMapper on ShiftDetailsModel {
 String formattedDate(String shiftDate, [String locale = 'en']) {
   final parsedDate = DateTime.tryParse(shiftDate);
   if (parsedDate == null) return shiftDate;
-  final formatter = DateFormat('d MMM, yyyy', locale);
-  return formatter.format(parsedDate);
+  try {
+    final formatter = DateFormat('d MMM, yyyy', locale);
+    return formatter.format(parsedDate);
+  } catch (_) {
+    return '${parsedDate.day}/${parsedDate.month}/${parsedDate.year}';
+  }
 }

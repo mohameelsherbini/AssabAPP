@@ -2,9 +2,11 @@ import 'package:assab/core/enums/text_form_type.dart';
 import 'package:assab/core/extensions/build_context_extensions.dart';
 import 'package:assab/core/extensions/number_extensions.dart';
 import 'package:assab/core/helpers/shared_preferences_helper.dart';
+import 'package:assab/core/services/auth_service.dart';
 import 'package:assab/core/services/token_storage_service.dart';
 import 'package:assab/core/services/user_type_service.dart';
 import 'package:assab/core/utils/app_dialog.dart';
+import 'package:assab/core/utils/app_reg_exp.dart';
 import 'package:assab/core/widgets/app_button.dart';
 import 'package:assab/core/widgets/app_button_loading.dart';
 import 'package:assab/core/widgets/app_gesture_detector_button.dart';
@@ -50,9 +52,15 @@ class _SharedLoginFormState extends State<SharedLoginForm> {
     super.initState();
     _passwordController = TextEditingController();
 
-    final savedIdentifier = widget.identifierType == LoginIdentifierType.email
+    final rawSaved = widget.identifierType == LoginIdentifierType.email
         ? getIt<SharedPreferencesHelper>().getString('u_email')
         : getIt<SharedPreferencesHelper>().getString('u_phone');
+
+    final savedIdentifier = rawSaved == null
+        ? null
+        : (widget.identifierType == LoginIdentifierType.phone
+              ? (AppRegExp.normalizeSaudiPhone(rawSaved) ?? rawSaved.trim())
+              : rawSaved.trim());
 
     _identifierController = TextEditingController(text: savedIdentifier ?? '');
 
@@ -70,23 +78,43 @@ class _SharedLoginFormState extends State<SharedLoginForm> {
 
   void _login() {
     final formState = context.read<LoginFormCubit>().state;
-    final identifier = widget.identifierType == LoginIdentifierType.phone
-        ? '+966${_identifierController.text}'
-        : _identifierController.text;
+    final trimmedInput = _identifierController.text.trim();
 
-    UserTypeService.selectedUserTypeStrategy!.login(
-      context,
-      identifier,
-      formState.password,
-    );
+    String identifier;
+    if (widget.identifierType == LoginIdentifierType.phone) {
+      final normalized =
+          AppRegExp.normalizeSaudiPhone(_identifierController.text);
+      if (normalized == null) {
+        context
+            .read<LoginFormCubit>()
+            .setIdentifierError('Invalid email or phone');
+        return;
+      }
+      identifier = normalized;
+    } else {
+      identifier = trimmedInput;
+    }
+
+    if (UserTypeService.selectedUserTypeStrategy == null) {
+      UserTypeService.restoreSavedUserType();
+    }
+    final strategy = UserTypeService.selectedUserTypeStrategy;
+    if (strategy == null) return;
+
+    strategy.login(context, identifier, formState.password);
   }
 
   Future<void> _saveToken(LoginEntity entity) async {
     await getIt<TokenStorageService>().saveAccessToken(entity.token);
   }
 
-  void _whenLoginSuccess(LoginEntity entity) async {
+  Future<void> _whenLoginSuccess(LoginEntity entity) async {
     final formState = context.read<LoginFormCubit>().state;
+    if (UserTypeService.selectedUserTypeStrategy == null) {
+      UserTypeService.restoreSavedUserType();
+    }
+    final strategy = UserTypeService.selectedUserTypeStrategy;
+    if (strategy == null) return;
 
     await Future.wait([
       _saveToken(entity),
@@ -96,17 +124,20 @@ class _SharedLoginFormState extends State<SharedLoginForm> {
               ? 'u_email'
               : 'u_phone',
           widget.identifierType == LoginIdentifierType.email
-              ? entity.email
-              : (entity.phone ?? ''),
+              ? (entity.email.isNotEmpty
+                    ? entity.email
+                    : _identifierController.text.trim())
+              : (AppRegExp.normalizeSaudiPhone(entity.phone ?? '') ??
+                  AppRegExp.normalizeSaudiPhone(_identifierController.text) ??
+                  _identifierController.text.trim()),
         ),
       getIt<SharedPreferencesHelper>().storeString('u_name', entity.name),
       getIt<SharedPreferencesHelper>().storeString('u_id', entity.id),
-      UserTypeService.saveSelectedUserType(
-        UserTypeService.selectedUserTypeStrategy!.userType,
-      ),
+      UserTypeService.saveSelectedUserType(strategy.userType),
     ]);
 
-    UserTypeService.selectedUserTypeStrategy!.goToMainScreen();
+    AuthService.markLoggedIn();
+    strategy.goToMainScreen();
   }
 
   void _loginListener(BuildContext context, LoginState state) {
@@ -154,6 +185,8 @@ class _SharedLoginFormState extends State<SharedLoginForm> {
                   label: context.tr.password,
                   hint: context.tr.passwordHint,
                   textFormType: TextFormType.password,
+                  autocorrect: false,
+                  enableSuggestions: false,
                   onChanged: (value) =>
                       context.read<LoginFormCubit>().updatePassword(value),
                   error: error,

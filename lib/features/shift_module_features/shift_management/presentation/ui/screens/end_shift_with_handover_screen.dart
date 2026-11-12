@@ -29,6 +29,7 @@ import '../../../domain/entity/cashier_entity.dart';
 import '../../logic/choose_employee/choose_employee_cubit.dart';
 import '../../logic/choose_variance_reason/choose_variance_reason_cubit.dart';
 import '../../logic/shifts/handover/handover_cubit.dart';
+import '../widgets/end_shift_widgets/cash_shortage_allocation_widget.dart';
 import '../widgets/end_shift_widgets/end_shift_request_widget.dart';
 import '../widgets/end_shift_widgets/hand_over_widget.dart';
 import '../widgets/reassign_widgets/reassign_shift_top_section.dart';
@@ -55,8 +56,10 @@ class _EndShiftWithHandoverScreenState
   late final TextEditingController _totalHandoverController;
   late final TextEditingController _madaSController;
   late final TextEditingController _cashController;
+  late final TextEditingController _countedCashController;
   late final TextEditingController _handoverAmountController;
   late final TextEditingController _handoverNoteController;
+  late final TextEditingController _pendingIncomingCashController;
 
   @override
   void initState() {
@@ -65,8 +68,10 @@ class _EndShiftWithHandoverScreenState
     _totalHandoverController = TextEditingController();
     _madaSController = TextEditingController();
     _cashController = TextEditingController();
+    _countedCashController = TextEditingController();
     _handoverAmountController = TextEditingController();
     _handoverNoteController = TextEditingController();
+    _pendingIncomingCashController = TextEditingController();
   }
 
   @override
@@ -75,8 +80,10 @@ class _EndShiftWithHandoverScreenState
     _totalHandoverController.dispose();
     _madaSController.dispose();
     _cashController.dispose();
+    _countedCashController.dispose();
     _handoverAmountController.dispose();
     _handoverNoteController.dispose();
+    _pendingIncomingCashController.dispose();
     super.dispose();
   }
 
@@ -161,6 +168,9 @@ class _EndShiftWithHandoverScreenState
                                     _totalHandoverController,
                                 madaController: _madaSController,
                                 cashController: _cashController,
+                                countedCashController: _countedCashController,
+                                pendingIncomingCashController:
+                                    _pendingIncomingCashController,
                                 viewUpload: true,
                               ),
                             ),
@@ -199,10 +209,65 @@ class _EndShiftWithHandoverScreenState
 
                             BlocBuilder<EndShiftCubit, EndShiftState>(
                               builder: (context, state) {
-                                return state.varianceStrategy?.buildUI(
-                                      context,
-                                    ) ??
-                                    const EndShiftWithHandoverSummaryWidget();
+                                final cubit = context.read<EndShiftCubit>();
+                                final preview = cubit.previewData;
+                                double shortage = 0;
+                                bool allocationRequired = false;
+                                if (preview != null) {
+                                  final pMap = (preview['data']
+                                          is Map<String, dynamic>)
+                                      ? preview['data'] as Map<String, dynamic>
+                                      : preview;
+                                  shortage =
+                                      (pMap['shortage_to_allocate'] as num?)
+                                              ?.toDouble() ??
+                                          0.0;
+                                  allocationRequired =
+                                      pMap['allocation_required'] == true;
+                                }
+
+                                return Column(
+                                  children: [
+                                    Expanded(
+                                      flex: (allocationRequired && shortage > 0) ? 1 : 1,
+                                      child: state.varianceStrategy?.buildUI(
+                                            context,
+                                          ) ??
+                                          const EndShiftWithHandoverSummaryWidget(),
+                                    ),
+                                    if (allocationRequired && shortage > 0) ...[
+                                      10.verticalSpace,
+                                      Expanded(
+                                        flex: 2,
+                                        child: SingleChildScrollView(
+                                          child: CashShortageAllocationWidget(
+                                            shortageAmount: shortage,
+                                            initialAllocations:
+                                                cubit.shortageAllocations,
+                                            candidates: cubit.shortageCandidates,
+                                            isLoadingCandidates:
+                                                cubit.isLoadingCandidates,
+                                            candidatesError:
+                                                cubit.candidatesError,
+                                            onRetryCandidates:
+                                                cubit.fetchShortageCandidates,
+                                            onAllocationsChanged: (allocs) {
+                                              cubit.updateShortageAllocations(allocs);
+                                              setState(() {});
+                                            },
+                                            initialReason: cubit.allocationReason,
+                                            onReasonChanged: (reason) {
+                                              cubit.updateShortageAllocations(
+                                                cubit.shortageAllocations,
+                                                reason,
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                );
                               },
                             ),
                           ];
@@ -298,8 +363,18 @@ class _EndShiftWithHandoverScreenState
                                     final bool totalSales =
                                         state.fieldsValidity['totalSales'] ??
                                         false;
+                                    final bool countedCash =
+                                        state.fieldsValidity['countedCash'] ??
+                                        false;
 
-                                    return totalSales;
+                                    return totalSales && countedCash;
+                                  }
+
+                                  if (pagingState.isLastStep) {
+                                    final cubit = context.read<EndShiftCubit>();
+                                    if (!cubit.canProceedToEndShift) {
+                                      return false;
+                                    }
                                   }
 
                                   if (pagingState.totalSteps == 3) {
@@ -375,10 +450,18 @@ class _EndShiftWithHandoverScreenState
                                           context: context,
                                           failure: state.failure,
                                         );
+                                      } else if (state is EndShiftPreviewFailure) {
+                                        return AppDialog.showErrorDialog(
+                                          context: context,
+                                          failure: state.failure,
+                                        );
                                       }
                                     },
                                     builder: (context, state) {
-                                      if (state is EndShiftLoading) {
+                                      final cubit = context.read<EndShiftCubit>();
+                                      if (state is EndShiftLoading ||
+                                          state is EndShiftPreviewLoading ||
+                                          cubit.isPreviewLoading) {
                                         return const AppButtonLoading();
                                       }
                                       return AppButton(
@@ -469,36 +552,50 @@ class _EndShiftWithHandoverScreenState
                                                   ),
                                                 );
                                               }
-                                            : () {
+                                            : () async {
                                                 if (currentIndex == 0) {
-                                                  //
-                                                  context
-                                                      .read<EndShiftCubit>()
-                                                      .endShiftTotalSalesValuesUpdated(
-                                                        totalSales:
-                                                            double.tryParse(
-                                                              _totalSaleSController
-                                                                  .text,
-                                                            ) ??
-                                                            0,
-                                                        cashCollected:
-                                                            double.tryParse(
-                                                              _cashController
-                                                                  .text,
-                                                            ) ??
-                                                            0,
-                                                        cardPayments:
-                                                            double.tryParse(
-                                                              _madaSController
-                                                                  .text,
-                                                            ) ??
-                                                            0,
-                                                        aggregators: context
-                                                            .read<
-                                                              AggregatorCubit
-                                                            >()
-                                                            .addedAggregators,
-                                                      );
+                                                  if (cubit.isPreviewLoading) return;
+
+                                                  final counted = double.tryParse(
+                                                    _countedCashController.text.trim(),
+                                                  );
+                                                  cubit.setCountedCash(counted);
+
+                                                  cubit.endShiftTotalSalesValuesUpdated(
+                                                    totalSales:
+                                                        double.tryParse(
+                                                          _totalSaleSController
+                                                              .text,
+                                                        ) ??
+                                                        0,
+                                                    cashCollected:
+                                                        double.tryParse(
+                                                          _cashController
+                                                              .text,
+                                                        ) ??
+                                                        0,
+                                                    cardPayments:
+                                                        double.tryParse(
+                                                          _madaSController
+                                                              .text,
+                                                        ) ??
+                                                        0,
+                                                    aggregators: context
+                                                        .read<
+                                                          AggregatorCubit
+                                                        >()
+                                                        .addedAggregators,
+                                                  );
+
+                                                  // Await server preview calculation
+                                                  final previewSuccess =
+                                                      await cubit
+                                                          .fetchCashReconciliationPreview();
+                                                  if (!context.mounted) return;
+                                                  if (!previewSuccess) {
+                                                    // Stay on step 0 if preview failed or is invalid
+                                                    return;
+                                                  }
 
                                                   final isVarianceDetected =
                                                       context
@@ -639,7 +736,10 @@ class _EndShiftWithHandoverScreenState
                                                   currentIndex,
                                                 );
                                               },
-                                        enabled: enableButton,
+                                        isFlexible: true,
+                                        enabled: pagingState.isLastStep
+                                            ? (enableButton && cubit.canProceedToEndShift)
+                                            : enableButton,
                                         text: pagingState.totalSteps == 3
                                             ? (currentIndex == 2
                                                   ? context.tr.end_shift

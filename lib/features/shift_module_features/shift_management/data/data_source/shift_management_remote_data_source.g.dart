@@ -12,13 +12,7 @@ part of 'shift_management_remote_data_source.dart';
 
 class _ShiftManagementRemoteDataSource
     implements ShiftManagementRemoteDataSource {
-  _ShiftManagementRemoteDataSource(
-    this._dio, {
-    this.baseUrl,
-    this.errorLogger,
-  }) {
-    baseUrl ??= 'https://ivory-snail-183262.hostingersite.com/api/v1/';
-  }
+  _ShiftManagementRemoteDataSource(this._dio, {this.baseUrl, this.errorLogger});
 
   final Dio _dio;
 
@@ -127,7 +121,7 @@ class _ShiftManagementRemoteDataSource
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'https://ivory-snail-183262.hostingersite.com/api/v1/aggregators',
+            'aggregators',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -526,6 +520,53 @@ class _ShiftManagementRemoteDataSource
   }
 
   @override
+  Future<Map<String, dynamic>> previewCashReconciliation({
+    required String shiftId,
+    required Map<String, dynamic> body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body);
+    final _options = _setStreamType<dynamic>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'branch-manager/shifts/${shiftId}/cash-reconciliation/preview',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch(_options);
+    final _value = _result.data;
+    return _value;
+  }
+
+  @override
+  Future<dynamic> getShortageAllocationCandidates({
+    required String shiftId,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<dynamic>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'branch-manager/shifts/$shiftId/shortage-allocation-candidates',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch(_options);
+    final _value = _result.data;
+    return _value;
+  }
+  @override
   Future<CurrentShiftResponse> getCurrentShift() async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
@@ -535,7 +576,7 @@ class _ShiftManagementRemoteDataSource
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'branch-manager//workday/current',
+            'branch-manager/workday/current',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -562,7 +603,7 @@ class _ShiftManagementRemoteDataSource
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'branch-manager//workday/start',
+            'branch-manager/workday/start',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -576,17 +617,21 @@ class _ShiftManagementRemoteDataSource
   @override
   Future<ShiftEndResponseModel> endManagerShift({
     required EndManagerShiftRequestModel endManagerShiftRequestModel,
+    String? idempotencyKey,
   }) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
-    final _headers = <String, dynamic>{};
+    final _headers = <String, dynamic>{
+      if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+    };
+    _headers.removeWhere((k, v) => v == null);
     final _data = <String, dynamic>{};
     _data.addAll(endManagerShiftRequestModel.toJson());
     final _options = _setStreamType<ShiftEndResponseModel>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'branch-manager//workday/end',
+            'branch-manager/workday/end',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -606,17 +651,21 @@ class _ShiftManagementRemoteDataSource
   @override
   Future<ManagerShiftUpdateResponseModel> updateManagerHandoverShift({
     required UpdateManagerHandoverRequestModel updateManagerShiftRequestModel,
+    String? idempotencyKey,
   }) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
-    final _headers = <String, dynamic>{};
+    final _headers = <String, dynamic>{
+      if (idempotencyKey != null) r'Idempotency-Key': idempotencyKey,
+    };
+    _headers.removeWhere((k, v) => v == null);
     final _data = <String, dynamic>{};
     _data.addAll(updateManagerShiftRequestModel.toJson());
     final _options = _setStreamType<ManagerShiftUpdateResponseModel>(
       Options(method: 'PUT', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'branch-manager//workday/daily-close',
+            'branch-manager/workday/daily-close',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -647,7 +696,7 @@ class _ShiftManagementRemoteDataSource
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'branch-manager/shifts/${shiftId}/start-handover',
+            'cashier/shifts/${shiftId}/start-handover',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -668,6 +717,27 @@ class _ShiftManagementRemoteDataSource
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
+            'cashier/shifts/${shiftId}/start',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch(_options);
+    final _value = _result.data;
+    return _value;
+  }
+
+  @override
+  Future<dynamic> startShiftByManager({required String shiftId}) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<dynamic>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
             'branch-manager/shifts/start-by-manager/${shiftId}',
             queryParameters: queryParameters,
             data: _data,
@@ -676,6 +746,87 @@ class _ShiftManagementRemoteDataSource
     );
     final _result = await _dio.fetch(_options);
     final _value = _result.data;
+    return _value;
+  }
+
+  @override
+  Future<dynamic> acceptCashierHandover({
+    required String shiftId,
+    HandoverApproveAndRejectBodyRequest? body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    queryParameters.removeWhere((k, v) => v == null);
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body?.toJson() ?? <String, dynamic>{});
+    final _options = _setStreamType<dynamic>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'cashier/shifts/${shiftId}/handover/accept',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch(_options);
+    final _value = _result.data;
+    return _value;
+  }
+
+  @override
+  Future<dynamic> rejectCashierHandover({
+    required String shiftId,
+    HandoverApproveAndRejectBodyRequest? body,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    queryParameters.removeWhere((k, v) => v == null);
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body?.toJson() ?? <String, dynamic>{});
+    final _options = _setStreamType<dynamic>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'cashier/shifts/${shiftId}/handover/reject',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch(_options);
+    final _value = _result.data;
+    return _value;
+  }
+
+  @override
+  Future<AvailableRecipientsResponseModel> getAvailableRecipients({
+    required String shiftId,
+  }) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<AvailableRecipientsResponseModel>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'cashier/shifts/${shiftId}/available-recipients',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, dynamic>>(_options);
+    late AvailableRecipientsResponseModel _value;
+    try {
+      _value = AvailableRecipientsResponseModel.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options);
+      rethrow;
+    }
     return _value;
   }
 
@@ -709,16 +860,23 @@ class _ShiftManagementRemoteDataSource
   }
 
   @override
-  Future<FinalDailyCloseResponse> getDailyClose() async {
+  Future<FinalDailyCloseResponse> getDailyClose({
+    String? managerWorkdayId,
+    String? workday,
+  }) async {
     final _extra = <String, dynamic>{};
-    final queryParameters = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{
+      r'manager_workday_id': managerWorkdayId,
+      r'workday': workday,
+    };
+    queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
     final _options = _setStreamType<FinalDailyCloseResponse>(
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'branch-manager//workday/daily-close',
+            'branch-manager/workday/daily-close',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -831,7 +989,7 @@ class _ShiftManagementRemoteDataSource
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'branch-manager//workday/handoffs/cashier/${handoverId}',
+            'branch-manager/workday/handoffs/cashier/${handoverId}',
             queryParameters: queryParameters,
             data: _data,
           )

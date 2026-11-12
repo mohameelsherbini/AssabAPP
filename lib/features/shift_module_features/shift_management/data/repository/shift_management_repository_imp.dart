@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+import '../model/shift/shortage_allocation_candidate.dart';
 import 'package:assab/features/shift_module_features/shift_management/data/mapper/cashier_mapper.dart';
 import 'package:assab/features/shift_module_features/shift_management/data/mapper/check_email_mapper.dart';
 import 'package:assab/features/shift_module_features/shift_management/data/mapper/shift/shift_mapper.dart';
@@ -31,6 +33,7 @@ import '../mapper/manager_shift/manager_shift_update_data_mapper.dart';
 import '../mapper/shift/handover_status_details_mappers/handover_status_details_mapper.dart';
 import '../mapper/shift/variance_details/handover_variance_details_mapper.dart';
 import '../model/add_cashier_models/update_cashier_request.dart';
+import '../model/available_recipients_response_model.dart';
 import '../model/cashiers_response_model.dart';
 import '../model/get_all_cashiers_and_managers_response_model.dart';
 import '../model/manager_shift_management_models/end_shift_models/update_manager_handover_request_model.dart';
@@ -42,8 +45,13 @@ import '../model/shift/handover_approve_body_request.dart';
 import '../model/shift/reassign_shift/reassign_shift_request_model.dart';
 import '../model/shift/shift_response_model.dart';
 
+import '../../domain/repository/shift_management_repository.dart';
+import '../model/shift/end_shift_aggregator_model.dart';
+
 @LazySingleton()
-class ShiftManagementRepositoryImp with RepositoryMixin {
+class ShiftManagementRepositoryImp
+    with RepositoryMixin
+    implements ShiftManagementRepository {
   final ShiftManagementRemoteDataSource _remoteDataSource;
 
   ShiftManagementRepositoryImp(this._remoteDataSource);
@@ -339,10 +347,12 @@ class ShiftManagementRepositoryImp with RepositoryMixin {
 
   FutureApiResult<ManagerShiftEndDataEntity> endManagerShift({
     required EndManagerShiftRequestModel request,
+    String? idempotencyKey,
   }) async {
     return execute(() async {
       final response = await _remoteDataSource.endManagerShift(
         endManagerShiftRequestModel: request,
+        idempotencyKey: idempotencyKey,
       );
 
       final ManagerShiftEndDataEntity entity = response.data.toEntity();
@@ -353,10 +363,12 @@ class ShiftManagementRepositoryImp with RepositoryMixin {
 
   FutureApiResult<ManagerShiftUpdateDataEntity> updateManagerHandoverShift({
     required UpdateManagerHandoverRequestModel request,
+    String? idempotencyKey,
   }) async {
     return execute(() async {
       final response = await _remoteDataSource.updateManagerHandoverShift(
         updateManagerShiftRequestModel: request,
+        idempotencyKey: idempotencyKey,
       );
 
       final ManagerShiftUpdateDataEntity entity = response.data.toEntity();
@@ -367,16 +379,63 @@ class ShiftManagementRepositoryImp with RepositoryMixin {
 
   FutureApiResult approveHandover({
     required String shiftId,
+    String? confirmedAmount,
     String? managerComment,
+    String? transferAttemptId,
   }) async {
     return execute(() async {
       await _remoteDataSource.approveHandover(
         shiftId: shiftId,
-        handoverApproveAndRejectBodyRequest: managerComment != null
-            ? HandoverApproveAndRejectBodyRequest(
-                managerComment: managerComment,
-              )
-            : null,
+        handoverApproveAndRejectBodyRequest:
+            HandoverApproveAndRejectBodyRequest(
+              confirmedAmount: confirmedAmount,
+              managerComment: managerComment,
+              transferAttemptId: transferAttemptId,
+            ),
+      );
+      return true;
+    });
+  }
+
+  FutureApiResult acceptCashierHandover({
+    required String shiftId,
+    required String confirmedAmount,
+    String? receivingShiftId,
+    String? transferAttemptId,
+    String? comment,
+  }) async {
+    return execute(() async {
+      await _remoteDataSource.acceptCashierHandover(
+        shiftId: shiftId,
+        body: HandoverApproveAndRejectBodyRequest(
+          confirmedAmount: confirmedAmount,
+          receivingShiftId: receivingShiftId,
+          transferAttemptId: transferAttemptId,
+          comment: comment,
+        ),
+      );
+      return true;
+    });
+  }
+
+  FutureApiResult rejectCashierHandover({
+    required String shiftId,
+    String? rejectionReason,
+    String? correctionReason,
+    String? confirmedAmount,
+    String? transferAttemptId,
+    String? managerComment,
+  }) async {
+    return execute(() async {
+      await _remoteDataSource.rejectCashierHandover(
+        shiftId: shiftId,
+        body: HandoverApproveAndRejectBodyRequest(
+          rejectionReason: rejectionReason,
+          correctionReason: correctionReason,
+          confirmedAmount: confirmedAmount,
+          transferAttemptId: transferAttemptId,
+          managerComment: managerComment,
+        ),
       );
       return true;
     });
@@ -435,6 +494,13 @@ class ShiftManagementRepositoryImp with RepositoryMixin {
     });
   }
 
+  FutureApiResult startShiftByManager(String shiftId) async {
+    return execute(() async {
+      await _remoteDataSource.startShiftByManager(shiftId: shiftId);
+      return true;
+    });
+  }
+
   FutureApiResult handOver({
     required String shiftId,
     required String cashierId,
@@ -459,6 +525,14 @@ class ShiftManagementRepositoryImp with RepositoryMixin {
     });
   }
 
+  FutureApiResult<AvailableRecipientsResponseModel> getAvailableRecipients(
+    String shiftId,
+  ) async {
+    return execute(() async {
+      return await _remoteDataSource.getAvailableRecipients(shiftId: shiftId);
+    });
+  }
+
   FutureApiResult<HandoverVarianceDetailsEntity?> getVarianceDetails(
     String shiftId,
   ) async {
@@ -471,9 +545,15 @@ class ShiftManagementRepositoryImp with RepositoryMixin {
     });
   }
 
-  FutureApiResult<FinalDailyCloseData> getDailyClose() async {
+  FutureApiResult<FinalDailyCloseData> getDailyClose({
+    String? managerWorkdayId,
+    String? workday,
+  }) async {
     return execute(() async {
-      final response = await _remoteDataSource.getDailyClose();
+      final response = await _remoteDataSource.getDailyClose(
+        managerWorkdayId: managerWorkdayId,
+        workday: workday,
+      );
 
       return response.data;
     });
@@ -510,6 +590,83 @@ class ShiftManagementRepositoryImp with RepositoryMixin {
         cashierId: cashierId,
       );
       return result.data.cashier.toEntity();
+    });
+  }
+
+  @override
+  FutureApiResult<Map<String, dynamic>> previewCashReconciliation({
+    required String shiftId,
+    required double totalSales,
+    required double countedCash,
+    double? cardPayments,
+    List<EndShiftAggregatorModel>? aggregators,
+    double? pendingIncomingCash,
+  }) async {
+    return execute(() async {
+      final body = <String, dynamic>{
+        'total_sales': totalSales.toStringAsFixed(2),
+        'counted_cash': countedCash.toStringAsFixed(2),
+        if (cardPayments != null)
+          'card_payments': cardPayments.toStringAsFixed(2),
+        if (pendingIncomingCash != null && pendingIncomingCash > 0)
+          'pending_incoming_cash': pendingIncomingCash.toStringAsFixed(2),
+        if (aggregators != null && aggregators.isNotEmpty)
+          'aggregators': aggregators
+              .map(
+                (a) => {
+                  'aggregator_id': a.aggregatorId,
+                  'amount': a.amount.toStringAsFixed(2),
+                },
+              )
+              .toList(),
+      };
+
+      final response = await _remoteDataSource.previewCashReconciliation(
+        shiftId: shiftId,
+        body: body,
+      );
+
+      if (response is Map<String, dynamic>) {
+        return response;
+      } else if (response is Map) {
+        return Map<String, dynamic>.from(response);
+      }
+      return <String, dynamic>{};
+    });
+  }
+
+  @override
+  FutureApiResult<List<ShortageAllocationCandidate>>
+  getShortageAllocationCandidates({required String shiftId}) async {
+    return execute(() async {
+      try {
+        final response = await _remoteDataSource
+            .getShortageAllocationCandidates(shiftId: shiftId);
+
+        final List<dynamic> list;
+        if (response is Map && response['data'] is List) {
+          list = response['data'] as List;
+        } else if (response is List) {
+          list = response;
+        } else {
+          list = [];
+        }
+
+        return list
+            .map(
+              (item) => ShortageAllocationCandidate.fromJson(
+                item is Map<String, dynamic>
+                    ? item
+                    : Map<String, dynamic>.from(item as Map),
+              ),
+            )
+            .where((candidate) => candidate.isValid)
+            .toList();
+      } on DioException {
+        // Handover recipient eligibility is fundamentally different from cash shortage liability.
+        // If the candidates endpoint fails or returns 404, fail closed.
+        rethrow;
+      }
     });
   }
 }

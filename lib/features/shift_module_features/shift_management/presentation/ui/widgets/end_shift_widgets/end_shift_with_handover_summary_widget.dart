@@ -1,3 +1,4 @@
+import 'package:assab/generated/l10n.dart';
 import 'package:assab/core/extensions/build_context_extensions.dart';
 import 'package:assab/core/extensions/number_extensions.dart';
 import 'package:assab/features/shift_module_features/shift_management/domain/entity/shift/end_shift_aggregator_entity.dart';
@@ -144,7 +145,7 @@ class SalesBreakDownAndHandOverAmountWidgetForEndShiftWithHandoverSummary
                   firstTitleSvgAsset: AppAssets.cash,
                   title: context.tr.deliveryApps,
                   value: aggregators
-                      .fold<double>(0, (sum, e) => sum + (e.amount ?? 0))
+                      .fold<double>(0, (sum, e) => sum + e.amount)
                       .toStringAsFixed(2),
 
                   firstValueSvgAsset: AppAssets.saudiRiyal,
@@ -177,16 +178,6 @@ class SalesBreakDownAndHandOverAmountWidgetForEndShiftWithHandoverSummary
 
                 buildShiftCardRowWidget(
                   context: context,
-                  firstTitleSvgAsset: AppAssets.cash,
-                  value: (context.watch<EndShiftCubit>().varianceAmount ?? 0)
-                      .toStringAsFixed(2),
-                  title: context.tr.variance,
-                  firstValueSvgAsset: AppAssets.saudiRiyal,
-                  hasSpaceBetweenTitleAndValue: true,
-                ),
-
-                buildShiftCardRowWidget(
-                  context: context,
                   firstTitleSvgAsset: AppAssets.personSvg,
                   value:
                       context.watch<EndShiftCubit>().cashier?.name ??
@@ -196,6 +187,95 @@ class SalesBreakDownAndHandOverAmountWidgetForEndShiftWithHandoverSummary
                 ),
               ],
             ),
+
+            if (context.watch<EndShiftCubit>().previewData != null &&
+                !context.watch<EndShiftCubit>().previewStale &&
+                !context.watch<EndShiftCubit>().isPreviewLoading &&
+                state is! EndShiftPreviewFailure) ...[
+              10.verticalSpace,
+              SummarizeCardWidget(
+                children: [
+                  Text(
+                    S.current.followupCashReconciliation,
+                    style: AppStyles.s14W500.copyWith(
+                      color: context.customColor.text1,
+                    ),
+                  ),
+                  SizedBox(width: 250.w, child: const CustomDivider()),
+                  if (context.watch<EndShiftCubit>().expectedCash != null)
+                    buildShiftCardRowWidget(
+                      context: context,
+                      firstTitleSvgAsset: AppAssets.cash,
+                      title: S.current.followupExpectedCash,
+                      value: context
+                          .watch<EndShiftCubit>()
+                          .expectedCash!
+                          .toStringAsFixed(2),
+                      firstValueSvgAsset: AppAssets.saudiRiyal,
+                      hasSpaceBetweenTitleAndValue: true,
+                    ),
+                  if (context.watch<EndShiftCubit>().previewCountedCash != null)
+                    buildShiftCardRowWidget(
+                      context: context,
+                      firstTitleSvgAsset: AppAssets.cash,
+                      title: context.tr.physicalCountedCash,
+                      value: context
+                          .watch<EndShiftCubit>()
+                          .previewCountedCash!
+                          .toStringAsFixed(2),
+                      firstValueSvgAsset: AppAssets.saudiRiyal,
+                      hasSpaceBetweenTitleAndValue: true,
+                    ),
+                  if (context.watch<EndShiftCubit>().cashVariance != null)
+                    buildShiftCardRowWidget(
+                      context: context,
+                      firstTitleSvgAsset: AppAssets.cash,
+                      title: context.tr.variance,
+                      value: context
+                          .watch<EndShiftCubit>()
+                          .cashVariance!
+                          .toStringAsFixed(2),
+                      firstValueSvgAsset: AppAssets.saudiRiyal,
+                      hasSpaceBetweenTitleAndValue: true,
+                    ),
+                  if (context.watch<EndShiftCubit>().cashVarianceType != null)
+                    buildShiftCardRowWidget(
+                      context: context,
+                      firstTitleSvgAsset: AppAssets.cash,
+                      title: context.tr.varianceType,
+                      value: context.watch<EndShiftCubit>().cashVarianceType!,
+                      hasSpaceBetweenTitleAndValue: true,
+                    ),
+                  if (context.watch<EndShiftCubit>().confirmedOpeningCash !=
+                      null)
+                    buildShiftCardRowWidget(
+                      context: context,
+                      firstTitleSvgAsset: AppAssets.cash,
+                      title: context.tr.openingBalanceTitle,
+                      value: context
+                          .watch<EndShiftCubit>()
+                          .confirmedOpeningCash!
+                          .toStringAsFixed(2),
+                      firstValueSvgAsset: AppAssets.saudiRiyal,
+                      hasSpaceBetweenTitleAndValue: true,
+                    ),
+                  if (context.watch<EndShiftCubit>().pendingIncomingCash !=
+                          null &&
+                      context.watch<EndShiftCubit>().pendingIncomingCash! > 0)
+                    buildShiftCardRowWidget(
+                      context: context,
+                      firstTitleSvgAsset: AppAssets.cash,
+                      title: context.tr.totalPendingAmounts,
+                      value: context
+                          .watch<EndShiftCubit>()
+                          .pendingIncomingCash!
+                          .toStringAsFixed(2),
+                      firstValueSvgAsset: AppAssets.saudiRiyal,
+                      hasSpaceBetweenTitleAndValue: true,
+                    ),
+                ],
+              ),
+            ],
 
             10.verticalSpace,
           ],

@@ -23,12 +23,15 @@ class HandoversResponseItem {
   final String shiftDate;
   final String shiftDateIso;
   final HandoverStatus status;
-  final num cashGiven;
+  final num? cashGiven;
   final String variance;
   final num varianceAmount;
   final String cashFrom;
   final String? acceptanceMessage;
   final String? responsibilityReviewedAt;
+  final bool? isIncoming;
+  final bool? isOutgoing;
+  final bool? canBeAccepted;
 
   const HandoversResponseItem({
     required this.id,
@@ -41,20 +44,26 @@ class HandoversResponseItem {
     required this.cashFrom,
     required this.acceptanceMessage,
     this.responsibilityReviewedAt,
+    this.isIncoming,
+    this.isOutgoing,
+    this.canBeAccepted,
   });
 
   factory HandoversResponseItem.fromJson(Map<String, dynamic> json) {
     return HandoversResponseItem(
-      id: json['id'],
-      shiftDate: json['shift_date'],
-      shiftDateIso: json['shift_date_iso'],
-      status: handoverStatusFromJson(json['status']),
-      cashGiven: json['cash_given'],
-      responsibilityReviewedAt: json['responsibility_reviewed_at'],
-      variance: json['variance'],
-      varianceAmount: json['variance_amount'],
-      cashFrom: json['cash_from'],
-      acceptanceMessage: json['acceptance_message'],
+      id: (json['id'] ?? '').toString(),
+      shiftDate: (json['shift_date'] as String?) ?? '',
+      shiftDateIso: (json['shift_date_iso'] as String?) ?? '',
+      status: handoverStatusFromJson(json['status'] as String?),
+      cashGiven: json['cash_given'] is num ? (json['cash_given'] as num) : num.tryParse(json['cash_given']?.toString() ?? ''),
+      responsibilityReviewedAt: json['responsibility_reviewed_at'] as String?,
+      variance: (json['variance'] ?? '').toString(),
+      varianceAmount: json['variance_amount'] is num ? (json['variance_amount'] as num) : (num.tryParse(json['variance_amount']?.toString() ?? '') ?? 0),
+      cashFrom: (json['cash_from'] ?? 'N/A').toString(),
+      acceptanceMessage: json['acceptance_message'] as String?,
+      isIncoming: json['is_incoming'] as bool?,
+      isOutgoing: json['is_outgoing'] as bool?,
+      canBeAccepted: json['can_be_accepted'] as bool? ?? false,
     );
   }
 }

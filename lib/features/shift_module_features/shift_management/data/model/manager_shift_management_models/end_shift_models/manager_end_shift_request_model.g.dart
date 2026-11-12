@@ -9,6 +9,7 @@ part of 'manager_end_shift_request_model.dart';
 EndManagerShiftRequestModel _$EndManagerShiftRequestModelFromJson(
   Map<String, dynamic> json,
 ) => EndManagerShiftRequestModel(
+  managerWorkdayId: json['manager_workday_id'] as String,
   handoverTo: json['handover_to'] as String?,
   handoverAmount: (json['handover_amount'] as num?)?.toDouble(),
   handoverTiming: $enumDecode(_$HandoverTimingEnumMap, json['handover_timing']),
@@ -18,13 +19,16 @@ EndManagerShiftRequestModel _$EndManagerShiftRequestModelFromJson(
   cardPayments: (json['card_payments'] as num?)?.toDouble(),
   aggregatorPayments: (json['aggregator_payments'] as num?)?.toDouble(),
   cashierBreakdown: (json['cashier_breakdown'] as List<dynamic>?)
-      ?.map((e) => CashierBreakdownModel.fromJson(e as Map<String, dynamic>))
+      ?.map(
+        (e) => CashierBreakdownRequestModel.fromJson(e as Map<String, dynamic>),
+      )
       .toList(),
 );
 
 Map<String, dynamic> _$EndManagerShiftRequestModelToJson(
   EndManagerShiftRequestModel instance,
 ) => <String, dynamic>{
+  'manager_workday_id': instance.managerWorkdayId,
   'handover_to': instance.handoverTo,
   'handover_amount': instance.handoverAmount,
   'handover_timing': _$HandoverTimingEnumMap[instance.handoverTiming]!,

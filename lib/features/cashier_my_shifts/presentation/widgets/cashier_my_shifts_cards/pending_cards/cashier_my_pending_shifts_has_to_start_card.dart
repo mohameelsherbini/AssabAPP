@@ -1,3 +1,4 @@
+import 'package:assab/core/strategies/user_type_strategy.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -50,17 +51,20 @@ class _CashierMyPendingShiftsHasToStartCardState
   void _calculateRemaining() {
     final now = DateTime.now();
 
-    final timeParts = widget.shift.startTime.split(':');
-
-    final hour = int.parse(timeParts[0]);
-    final minute = int.parse(timeParts[1]);
+    final parsed = CashierShiftTimeFormatter.parseApiTime(
+      widget.shift.startTime,
+    );
+    if (parsed == null) {
+      remaining = Duration.zero;
+      return;
+    }
 
     final shiftStart = DateTime(
       widget.shift.date.year,
       widget.shift.date.month,
       widget.shift.date.day,
-      hour,
-      minute,
+      parsed.hour,
+      parsed.minute,
     );
 
     remaining = shiftStart.difference(now);
@@ -129,11 +133,12 @@ class _CashierMyPendingShiftsHasToStartCardState
 
             ValueListenableBuilder<Duration>(
               valueListenable: remainingNotifier,
-              builder: (_, value, __) {
+              builder: (_, value, _) {
                 return buildShiftCardRowWidget(
                   context: context,
                   title: context.tr.start_time,
-                  value: CashierShiftTimeFormatter.format(
+                  value: CashierShiftTimeFormatter.formatForUi(
+                    context,
                     widget.shift.startTime,
                   ),
                   firstTitleSvgAsset: AppAssets.clockSvg,
@@ -227,7 +232,7 @@ class _CashierMyPendingShiftsHasToStartCardState
             // ),
             ValueListenableBuilder<Duration>(
               valueListenable: remainingNotifier,
-              builder: (_, value, __) {
+              builder: (_, value, _) {
                 // StartCashierShiftCubit
                 return BlocConsumer<
                   StartCashierShiftCubit,
@@ -254,9 +259,10 @@ class _CashierMyPendingShiftsHasToStartCardState
                       padding: EdgeInsets.all(15.w),
                       borderRadius: BorderRadius.circular(12.r),
                       onClick: () {
-                        context
-                            .read<StartCashierShiftCubit>()
-                            .startCashierShift(widget.shift.id);
+                        context.read<StartCashierShiftCubit>().startShift(
+                          shiftId: widget.shift.id,
+                          actorRole: UserType.cashier,
+                        );
                       },
                       text: context.tr.start_shift,
                       isTransparent: !(value.inSeconds <= 0),

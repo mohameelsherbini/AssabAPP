@@ -8,6 +8,39 @@ final class FinalDailyCloseInitial extends FinalDailyCloseState {}
 final class FinalDailyCloseFetchLoading extends FinalDailyCloseState {}
 
 class FinalDailyCloseLoadedOrUpdated extends FinalDailyCloseState {
+  final String? managerWorkdayId;
+  final String? businessDate;
+  final String? serverTime;
+  final String? timezone;
+  final Map<String, String> workdayDates;
+  final int? managerReportRevision;
+  final bool? serverSubmitted;
+  final bool managerShiftCompleted;
+  final String? managerId;
+  final String? branchId;
+
+  bool get canSubmitFinal =>
+      canSubmit &&
+      managerShiftCompleted &&
+      managerId?.isNotEmpty == true &&
+      branchId?.isNotEmpty == true &&
+      serverSubmitted == false &&
+      managerReportRevision != null &&
+      managerReportRevision! > 0 &&
+      cashiers.every((c) => !c.isModified);
+
+  bool get canSubmit =>
+      managerWorkdayId?.isNotEmpty == true &&
+      businessDate?.isNotEmpty == true &&
+      cashiers.every(
+        (c) =>
+            c.cashierShiftId?.isNotEmpty == true &&
+            (!c.isModified ||
+                (c.expectedRevision != null &&
+                    c.reason?.trim().isNotEmpty == true)),
+      ) &&
+      cashiers.map((c) => c.cashierShiftId).toSet().length == cashiers.length;
+
   final List<CashierBreakdownEntity> cashiers;
   final TotalsEntity totals;
   final List<AggregatorFinalDailyCloseEntity>? aggregators;
@@ -15,6 +48,16 @@ class FinalDailyCloseLoadedOrUpdated extends FinalDailyCloseState {
   final bool isExpanded; // NEW
 
   FinalDailyCloseLoadedOrUpdated({
+    this.managerWorkdayId,
+    this.businessDate,
+    this.serverTime,
+    this.timezone,
+    this.workdayDates = const {},
+    this.managerReportRevision,
+    this.serverSubmitted,
+    this.managerShiftCompleted = false,
+    this.managerId,
+    this.branchId,
     required this.cashiers,
     required this.totals,
     this.aggregators,
@@ -30,6 +73,16 @@ class FinalDailyCloseLoadedOrUpdated extends FinalDailyCloseState {
     bool? isExpanded,
   }) {
     return FinalDailyCloseLoadedOrUpdated(
+      managerWorkdayId: managerWorkdayId,
+      businessDate: businessDate,
+      serverTime: serverTime,
+      timezone: timezone,
+      workdayDates: workdayDates,
+      managerReportRevision: managerReportRevision,
+      serverSubmitted: serverSubmitted,
+      managerShiftCompleted: managerShiftCompleted,
+      managerId: managerId,
+      branchId: branchId,
       cashiers: cashiers ?? this.cashiers,
       totals: totals ?? this.totals,
       aggregators: aggregators ?? this.aggregators,

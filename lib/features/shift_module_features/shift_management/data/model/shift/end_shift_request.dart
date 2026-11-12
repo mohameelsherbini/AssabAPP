@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:assab/features/shift_module_features/shift_management/data/model/shift/variance_model.dart';
 import 'package:dio/dio.dart';
 
+import 'cash_shortage_allocation.dart';
 import 'end_shift_aggregator_model.dart';
 
 class EndShiftRequest {
@@ -20,6 +21,14 @@ class EndShiftRequest {
 
   final bool isThereVariance;
 
+  final double? countedCash;
+
+  final List<CashShortageAllocation>? shortageAllocations;
+
+  final String? allocationReason;
+
+  final double? pendingIncomingCash;
+
   EndShiftRequest({
     required this.totalSales,
     required this.cashCollected,
@@ -28,6 +37,10 @@ class EndShiftRequest {
     required this.variance,
     required this.isThereVariance,
     this.posReceipt,
+    this.countedCash,
+    this.shortageAllocations,
+    this.allocationReason,
+    this.pendingIncomingCash,
   });
 
   Future<FormData> toFormData() async {
@@ -88,6 +101,32 @@ class EndShiftRequest {
               await MultipartFile.fromFile(file.path);
         }
       }
+    }
+
+    if (countedCash != null) {
+      formMap['counted_cash'] = countedCash!.toStringAsFixed(2);
+    }
+
+    if (pendingIncomingCash != null && pendingIncomingCash! > 0) {
+      formMap['pending_incoming_cash'] = pendingIncomingCash!.toStringAsFixed(
+        2,
+      );
+    }
+
+    if (shortageAllocations != null && shortageAllocations!.isNotEmpty) {
+      for (int i = 0; i < shortageAllocations!.length; i++) {
+        final alloc = shortageAllocations![i];
+        formMap['shortage_allocations[$i][responsible_type]'] =
+            alloc.responsibleType;
+        formMap['shortage_allocations[$i][responsible_id]'] =
+            alloc.responsibleId;
+        formMap['shortage_allocations[$i][amount]'] = alloc.amount
+            .toStringAsFixed(2);
+      }
+    }
+
+    if (allocationReason != null && allocationReason!.isNotEmpty) {
+      formMap['allocation_reason'] = allocationReason;
     }
 
     return FormData.fromMap(formMap);

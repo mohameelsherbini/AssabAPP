@@ -19,6 +19,7 @@ extension HandoverStatusUIMapper on HandoverStatus {
       case HandoverStatus.accepted:
         return S.current.completed_name;
       case HandoverStatus.rejected:
+      case HandoverStatus.rejectedFinal:
         return S.current.rejected;
       case HandoverStatus.notSubmitted:
         return S.current.notSubmitted;
@@ -32,6 +33,7 @@ extension HandoverStatusUIMapper on HandoverStatus {
       case HandoverStatus.accepted:
         return S.current.handoverAcceptedDesc(cashierName, dateAndTime!);
       case HandoverStatus.rejected:
+      case HandoverStatus.rejectedFinal:
         return S.current.handoverRejectedDesc(cashierName);
       case HandoverStatus.notSubmitted:
         return S.current.noHandoverSubmittedYet;
@@ -45,6 +47,7 @@ extension HandoverStatusUIMapper on HandoverStatus {
       case HandoverStatus.accepted:
         return S.current.youAcceptedThisHandover(dateAndTime ?? '');
       case HandoverStatus.rejected:
+      case HandoverStatus.rejectedFinal:
         return S.current.youRejectedThisHandover(dateAndTime ?? '');
       case HandoverStatus.notSubmitted:
         return S.current.noHandoverSubmittedYet;
@@ -61,6 +64,7 @@ extension HandoverStatusUIMapper on HandoverStatus {
       case HandoverStatus.accepted:
         return S.current.handoverApprovedByYou(dateAndTime!);
       case HandoverStatus.rejected:
+      case HandoverStatus.rejectedFinal:
         return S.current.youRequestedCashierToMakeCorrections(cashierName!);
       case HandoverStatus.notSubmitted:
         return S.current.noHandoverSubmittedYet;
@@ -92,12 +96,16 @@ extension HandoverStatusUIMapper on HandoverStatus {
                 buttonWidth: 150.w,
                 cashierShiftId: handover.cashierShiftId,
                 cashierName: handover.cashierName,
+                cashFrom: handover.cashierName,
+                cashGiven: handover.handoverAmount,
+                variance: handover.varianceAmount,
                 managerName: managerName,
                 successFunction: () {
                   context.read<ManagerShiftCubit>().getCurrentShift();
                 },
                 isTheCurrentStatusRejected:
-                    handover.handoverStatus == HandoverStatus.rejected,
+                    handover.handoverStatus == HandoverStatus.rejected ||
+                    handover.handoverStatus == HandoverStatus.rejectedFinal,
                 openedFromModalSheet: true,
               ),
             ],
@@ -128,6 +136,7 @@ extension HandoverStatusUIMapper on HandoverStatus {
           ),
         );
       case HandoverStatus.rejected:
+      case HandoverStatus.rejectedFinal:
         return SizedBox(
           width: double.infinity,
           child: Row(
@@ -151,12 +160,14 @@ extension HandoverStatusUIMapper on HandoverStatus {
                 buttonWidth: 150.w,
                 cashierShiftId: handover.cashierShiftId,
                 cashierName: handover.cashierName,
+                cashFrom: handover.cashierName,
+                cashGiven: handover.handoverAmount,
+                variance: handover.varianceAmount,
                 managerName: managerName,
                 successFunction: () {
                   context.read<ManagerShiftCubit>().getCurrentShift();
                 },
-                isTheCurrentStatusRejected:
-                    handover.handoverStatus == HandoverStatus.rejected,
+                isTheCurrentStatusRejected: true,
                 openedFromModalSheet: true,
               ),
             ],
@@ -180,12 +191,16 @@ extension HandoverStatusUIMapper on HandoverStatus {
                 buttonWidth: 150.w,
                 cashierShiftId: handover.cashierShiftId,
                 cashierName: handover.cashierName,
+                cashFrom: handover.cashierName,
+                cashGiven: handover.handoverAmount,
+                variance: handover.varianceAmount,
                 managerName: managerName,
                 successFunction: () {
                   context.read<ManagerShiftCubit>().getCurrentShift();
                 },
                 isTheCurrentStatusRejected:
-                    handover.handoverStatus == HandoverStatus.rejected,
+                    handover.handoverStatus == HandoverStatus.rejected ||
+                    handover.handoverStatus == HandoverStatus.rejectedFinal,
                 openedFromModalSheet: true,
               ),
             ],
@@ -201,6 +216,7 @@ extension HandoverStatusUIMapper on HandoverStatus {
       case HandoverStatus.accepted:
         return AppColors.green.withAlpha(10);
       case HandoverStatus.rejected:
+      case HandoverStatus.rejectedFinal:
         return AppColors.red.withAlpha(10);
       case HandoverStatus.notSubmitted:
         return AppColors.darkGray.withAlpha(10);
@@ -214,6 +230,7 @@ extension HandoverStatusUIMapper on HandoverStatus {
       case HandoverStatus.accepted:
         return AppColors.darkGreen;
       case HandoverStatus.rejected:
+      case HandoverStatus.rejectedFinal:
         return Colors.red;
       case HandoverStatus.notSubmitted:
         return AppColors.sBlack;

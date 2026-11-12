@@ -5,8 +5,19 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
-    id("com.google.firebase.crashlytics")
+    id("com.google.gms.google-services") apply false
+    id("com.google.firebase.crashlytics") apply false
+}
+
+// Only apply Google Services / Crashlytics when a real Firebase configuration file exists
+// and we are not building the standalone Shift Demo flavor.
+val isShiftDemo = gradle.startParameter.taskNames.any { it.contains("Demo", ignoreCase = true) }
+val hasGoogleServicesConfig = file("google-services.json").exists() ||
+    file("src/development/google-services.json").exists() ||
+    file("src/production/google-services.json").exists()
+if (!isShiftDemo && hasGoogleServicesConfig) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
 }
 
 val keyPropertiesFile = rootProject.file("key.properties")
@@ -68,6 +79,11 @@ android {
 
     flavorDimensions += listOf("env")
     productFlavors {
+        create("demo") {
+            dimension = "env"
+            applicationIdSuffix = ".shiftdemo"
+            resValue("string", "app_name", "Assab Shift Demo")
+        }
         create("development") {
             dimension = "env"
             applicationIdSuffix = ".dev"

@@ -1,5 +1,6 @@
 // ignore_for_file: unused_import
 
+import 'package:dio/dio.dart';
 import 'package:assab/core/cubits/add_item/add_item_cubit.dart';
 import 'package:assab/core/cubits/media/media_cubit.dart';
 import 'package:assab/core/cubits/switch_button/switch_button_cubit.dart';
@@ -125,6 +126,8 @@ import '../../features/custody/presentation/screens/custody_balance_trend_state.
 import '../../features/custody/presentation/screens/custody_handover_to_cashier_details_screen.dart';
 import '../../features/custody/presentation/screens/custody_request_success_screen.dart';
 import '../../features/custody/presentation/screens/custody_screen.dart';
+import '../../features/custody/presentation/cubit/get_personal_balance_transactions/get_personal_balance_transactions_cubit.dart';
+import '../../features/custody/presentation/widgets/see_all_personal_custody_activities.dart';
 import '../../features/fixed_assets/data/models/fixed_assets_search_response.dart';
 import '../../features/fixed_assets/domain/enums/fixed_assets_handover_status_filter_enum.dart';
 import '../../features/fixed_assets/domain/strategies/fixed_assets_transfer_types_strategy.dart';
@@ -228,6 +231,7 @@ import '../../features/shift_module_features/shift_management/presentation/logic
 import '../../features/shift_module_features/shift_management/presentation/ui/arguments/shift_arguments.dart';
 import '../../features/shift_module_features/shift_management/presentation/ui/screens/cashier_shifts_screen.dart';
 import '../../features/shift_module_features/shift_management/presentation/ui/screens/cashiers_management_screen.dart';
+import '../../features/shift_module_features/shift_management/presentation/ui/screens/dated_shift_assignment_screen.dart';
 import '../../features/shift_module_features/shift_management/presentation/ui/screens/end_shift_with_handover_screen.dart';
 import '../../features/shift_module_features/shift_management/presentation/ui/screens/handover_only_screen.dart';
 import '../../features/shift_module_features/shift_management/presentation/ui/screens/reassign_shift_with_handover_screen.dart';
@@ -305,6 +309,10 @@ class AppRouter {
     final userType = UserTypeService.getSavedUserType();
 
     if (AuthService.isLoggedInVal && userType != null) {
+      UserTypeService.setUserType(
+        strategy: UserTypeService.strategyFor(userType),
+        userType: userType,
+      );
       switch (userType) {
         case UserType.branchManager:
           return _branchManagerMainScreenRoute(settings);
@@ -599,6 +607,13 @@ class AppRouter {
           ),
           settings: settings,
         );
+      case AppRouteName.datedShiftAssignmentScreen:
+        return MaterialPageRoute(
+          builder: (context) => DatedShiftAssignmentScreen(
+            dio: getIt.isRegistered<Dio>() ? getIt<Dio>() : null,
+          ),
+          settings: settings,
+        );
       case AppRouteName.addCashierScreen:
         final cashierCubit = settings.arguments as CashierManagementCubit;
         return MaterialPageRoute(
@@ -832,6 +847,19 @@ class AppRouter {
             child: const CustodyScreen(),
           ),
         );
+      case AppRouteName.accountStatementScreen:
+        return MaterialPageRoute(
+          builder: (context) => MultiBlocProvider(
+            providers: [
+              BlocProvider(create: (context) => PagingCubit(totalSteps: 2)),
+              BlocProvider(
+                create: (context) =>
+                    getIt<GetPersonalBalanceTransactionsCubit>(),
+              ),
+            ],
+            child: const SeeAllPersonalCustodyActivities(),
+          ),
+        );
       case AppRouteName.custodyRequestSuccessScreen:
         return MaterialPageRoute(
           builder: (context) => const CustodyRequestSuccessScreen(),
@@ -1017,6 +1045,7 @@ class AppRouter {
         final handovers = args['handovers'] as List<HandoverDetailsEntity>;
         final managerName = args['managerName'] as String;
         final managerCubit = args['managerCubit'] as ManagerShiftCubit;
+        final serverCanEnd = args['serverCanEnd'] as bool? ?? managerCubit.managerShift.canEnd;
 
         return MaterialPageRoute(
           builder: (context) => MultiBlocProvider(
@@ -1032,13 +1061,14 @@ class AppRouter {
                 create: (_) => getIt<EndAndUpdateManagerShiftCubit>(),
               ),
               BlocProvider(
-                create: (_) => getIt<FinalDailyCloseCubit>()..getDailyClose(),
+                create: (_) => getIt<FinalDailyCloseCubit>()..getDailyClose(managerWorkdayId: managerCubit.managerShift.shift.id),
               ),
               BlocProvider.value(value: managerCubit),
             ],
             child: EndManagerShiftScreen(
               handovers: handovers,
               managerName: managerName,
+              serverCanEnd: serverCanEnd,
             ),
           ),
         );
@@ -1054,7 +1084,7 @@ class AppRouter {
                 create: (_) => getIt<EndAndUpdateManagerShiftCubit>(),
               ),
               BlocProvider(
-                create: (_) => getIt<FinalDailyCloseCubit>()..getDailyClose(),
+                create: (_) => getIt<FinalDailyCloseCubit>()..getDailyClose(managerWorkdayId: args['manager_workday_id'] as String? ?? managerCubit.managerShift.shift.id),
               ),
               BlocProvider.value(value: managerCubit),
             ],

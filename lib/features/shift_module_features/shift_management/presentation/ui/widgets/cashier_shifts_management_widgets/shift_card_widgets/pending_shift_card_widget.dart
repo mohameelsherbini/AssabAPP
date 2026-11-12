@@ -1,3 +1,4 @@
+import 'package:assab/core/services/user_type_service.dart';
 import 'package:assab/core/extensions/build_context_extensions.dart';
 import 'package:assab/core/extensions/number_extensions.dart';
 import 'package:assab/core/routing/app_route_name.dart';
@@ -137,6 +138,7 @@ class PendingShiftCardWidget extends ShiftCardStrategy {
                   child: CashierStartShiftButton(
                     shiftId: shift.id,
                     selectedShiftsStatus: selectedShiftsStatus,
+                    actorRole: UserTypeService.selectedUserType ?? UserTypeService.getSavedUserType(),
                   ),
                 )
               else
@@ -154,7 +156,7 @@ class PendingShiftCardWidget extends ShiftCardStrategy {
                         },
                       );
 
-                      if (result == true) {
+                      if (result == true && context.mounted) {
                         context
                             .read<CashierShiftsManagementCubit>()
                             .getPendingShifts();

@@ -1,3 +1,4 @@
+import 'package:assab/generated/l10n.dart';
 import 'package:assab/core/extensions/build_context_extensions.dart';
 import 'package:assab/core/extensions/number_extensions.dart';
 import 'package:assab/core/routing/app_route_name.dart';
@@ -8,6 +9,7 @@ import '../../../../core/constants/app_assets.dart';
 import '../../../../core/styles/app_styles.dart';
 import '../../../../core/widgets/custom_divider.dart';
 import 'branch_manager_grid_view_item.dart';
+import '../../../../core/utils/app_snack_bar.dart';
 
 class BranchManagerHomeBottomSection extends StatelessWidget {
   const BranchManagerHomeBottomSection({super.key});
@@ -30,7 +32,7 @@ class BranchManagerHomeBottomSection extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Tools & Records (9)',
+                  context.tr.toolsAndRecordsCount(9),
                   style: AppStyles.s16W500.copyWith(
                     color: context.customColor.text1,
                   ),
@@ -74,7 +76,7 @@ class BranchManagerHomeBottomSection extends StatelessWidget {
                 colorHex: 0xffFCFAFF,
                 title: context.tr.custodyBalance,
                 iconAssetName: AppAssets.custody,
-                subtitle: '16',
+                subtitle: '',
                 onTap: () {
                   NavigationService.I.pushNamed(AppRouteName.custodyScreen);
                 },
@@ -83,7 +85,7 @@ class BranchManagerHomeBottomSection extends StatelessWidget {
                 colorHex: 0xfff2f2f2,
                 title: context.tr.purchaseHistory,
                 iconAssetName: AppAssets.box,
-                subtitle: '16',
+                subtitle: '',
                 onTap: () {
                   NavigationService.I.pushNamed(
                     AppRouteName.purchaseHistoryScreen,
@@ -94,7 +96,7 @@ class BranchManagerHomeBottomSection extends StatelessWidget {
                 colorHex: 0xfffef3f5,
                 title: context.tr.returnsManagement,
                 iconAssetName: AppAssets.returnsManagement,
-                subtitle: '16',
+                subtitle: '',
                 onTap: () {
                   NavigationService.I.pushNamed(
                     AppRouteName.returnsManagementScreen,
@@ -105,7 +107,7 @@ class BranchManagerHomeBottomSection extends StatelessWidget {
                 colorHex: 0xfff5f9ff,
                 title: context.tr.recurringOrders,
                 iconAssetName: AppAssets.recurringOrders,
-                subtitle: '3',
+                subtitle: '',
                 onTap: () {
                   NavigationService.I.pushNamed(
                     AppRouteName.recurringOrdersScreen,
@@ -116,14 +118,19 @@ class BranchManagerHomeBottomSection extends StatelessWidget {
                 colorHex: 0xfffffdf5,
                 title: context.tr.myLedger,
                 iconAssetName: AppAssets.myLedger,
-                subtitle: '16',
-                onTap: () {},
+                subtitle: '',
+                onTap: () {
+                  AppSnackBar.showError(
+                    context,
+                    S.current.followupMyLedgerFeatureIsComingSoon,
+                  );
+                },
               ),
               BranchManagerGridViewItem(
                 colorHex: 0xfff2fcfc,
                 title: context.tr.cashiersList,
                 iconAssetName: AppAssets.cashiersList,
-                subtitle: '16',
+                subtitle: '',
                 onTap: () {
                   NavigationService.I.pushNamed(
                     AppRouteName.cashiersManagementScreen,
@@ -134,14 +141,18 @@ class BranchManagerHomeBottomSection extends StatelessWidget {
                 colorHex: 0xfffef8f4,
                 title: context.tr.accountStatement,
                 iconAssetName: AppAssets.accountStatement,
-                subtitle: '16',
-                onTap: () {},
+                subtitle: '',
+                onTap: () {
+                  NavigationService.I.pushNamed(
+                    AppRouteName.accountStatementScreen,
+                  );
+                },
               ),
               BranchManagerGridViewItem(
                 colorHex: 0xfff4f4f7,
                 title: context.tr.inventoryManagement,
                 iconAssetName: AppAssets.receipt,
-                subtitle: '16',
+                subtitle: '',
                 onTap: () {
                   NavigationService.I.pushNamed(AppRouteName.inventoryScreen);
                 },
@@ -150,7 +161,7 @@ class BranchManagerHomeBottomSection extends StatelessWidget {
                 colorHex: 0xfff3fef3,
                 title: context.tr.fixedAssets,
                 iconAssetName: AppAssets.fixedAssets,
-                subtitle: '16',
+                subtitle: '',
                 onTap: () {
                   NavigationService.I.pushNamed(AppRouteName.fixedAssetsScreen);
                 },

@@ -1,3 +1,4 @@
+import 'package:assab/core/services/user_type_service.dart';
 import 'package:assab/core/extensions/build_context_extensions.dart';
 import 'package:assab/core/extensions/number_extensions.dart';
 import 'package:assab/features/shift_module_features/shift_management/data/mapper/shift/shift_details/shift_status_ui_mapper.dart';
@@ -172,6 +173,7 @@ class ReassignedShiftCardWidget extends ShiftCardStrategy {
                 child: CashierStartShiftButton(
                   shiftId: shift.id,
                   selectedShiftsStatus: selectedShiftsStatus,
+                  actorRole: UserTypeService.selectedUserType ?? UserTypeService.getSavedUserType(),
                 ),
               ),
 

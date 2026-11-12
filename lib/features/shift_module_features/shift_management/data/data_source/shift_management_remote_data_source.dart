@@ -9,6 +9,7 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import '../../../../../core/network/api_endpoints.dart';
+import '../model/available_recipients_response_model.dart';
 import '../model/add_cashier_models/check_email_response_model.dart';
 import '../model/cashier_details_response_model.dart';
 import '../model/cashiers_response_model.dart';
@@ -134,6 +135,19 @@ abstract class ShiftManagementRemoteDataSource {
     @Body() required FormData data,
   });
 
+  @POST('${ApiEndpoint.branchManagerShifts}/{shift}/cash-reconciliation/preview')
+
+  Future<dynamic> previewCashReconciliation({
+    @Path('shift') required String shiftId,
+    @Body() required Map<String, dynamic> body,
+  });
+
+  @GET(ApiEndpoint.shortageAllocationCandidates)
+  Future<dynamic> getShortageAllocationCandidates({
+    @Path('shift') required String shiftId,
+  });
+
+
   @GET('${ApiEndpoint.branchWorkDayMgmt}/current')
   Future<CurrentShiftResponse> getCurrentShift();
 
@@ -143,22 +157,44 @@ abstract class ShiftManagementRemoteDataSource {
   @POST('${ApiEndpoint.branchWorkDayMgmt}/end')
   Future<ShiftEndResponseModel> endManagerShift({
     @Body() required EndManagerShiftRequestModel endManagerShiftRequestModel,
+    @Header('Idempotency-Key') String? idempotencyKey,
   });
 
   @PUT('${ApiEndpoint.branchWorkDayMgmt}/daily-close')
   Future<ManagerShiftUpdateResponseModel> updateManagerHandoverShift({
     @Body()
     required UpdateManagerHandoverRequestModel updateManagerShiftRequestModel,
+    @Header('Idempotency-Key') String? idempotencyKey,
   });
 
-  @POST('${ApiEndpoint.branchManagerShifts}/{shift}/start-handover')
+  @POST(ApiEndpoint.cashierStartHandover)
   Future<dynamic> handOver({
     @Path('shift') required String shiftId,
     @Body() required HandOverRequest handOverRequest,
   });
 
-  @POST('${ApiEndpoint.branchManagerShifts}/start-by-manager/{shiftId}')
+  @POST(ApiEndpoint.cashierStartShift)
   Future startCashierShift({@Path('shiftId') required String shiftId});
+
+  @POST(ApiEndpoint.branchManagerStartShift)
+  Future startShiftByManager({@Path('shiftId') required String shiftId});
+
+  @POST('${ApiEndpoint.cashierShifts}/{shift}/handover/accept')
+  Future acceptCashierHandover({
+    @Path('shift') required String shiftId,
+    @Body() HandoverApproveAndRejectBodyRequest? body,
+  });
+
+  @POST('${ApiEndpoint.cashierShifts}/{shift}/handover/reject')
+  Future rejectCashierHandover({
+    @Path('shift') required String shiftId,
+    @Body() HandoverApproveAndRejectBodyRequest? body,
+  });
+
+  @GET(ApiEndpoint.cashierAvailableRecipients)
+  Future<AvailableRecipientsResponseModel> getAvailableRecipients({
+    @Path('shift') required String shiftId,
+  });
 
   @GET('${ApiEndpoint.branchManagerShifts}/{shift}/variance')
   Future<VarianceResponseModel> getVarianceDetails({
@@ -166,7 +202,10 @@ abstract class ShiftManagementRemoteDataSource {
   });
 
   @GET('${ApiEndpoint.branchWorkDayMgmt}/daily-close')
-  Future<FinalDailyCloseResponse> getDailyClose();
+  Future<FinalDailyCloseResponse> getDailyClose({
+    @Query('manager_workday_id') String? managerWorkdayId,
+    @Query('workday') String? workday,
+  });
 
   @POST('${ApiEndpoint.branchManagerShifts}/{shift}/handover/approve')
   Future approveHandover({

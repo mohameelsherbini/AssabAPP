@@ -1,3 +1,4 @@
+import 'package:assab/generated/l10n.dart';
 import 'package:assab/core/cubits/choose_item/choose_item_cubit.dart';
 import 'package:assab/core/di/dependency_injection.dart';
 import 'package:assab/core/extensions/build_context_extensions.dart';
@@ -30,12 +31,32 @@ import '../widgets/shift_management_from_app_bar.dart';
 class EndManagerShiftScreen extends StatefulWidget {
   final List<HandoverDetailsEntity> handovers;
   final String managerName;
+  final bool? serverCanEnd;
 
   const EndManagerShiftScreen({
     super.key,
     required this.handovers,
     required this.managerName,
+    this.serverCanEnd,
   });
+
+  static bool canProceedFromHandovers(
+    List<HandoverDetailsEntity> handovers, {
+    bool? serverCanEnd,
+  }) {
+    if (serverCanEnd != null) {
+      return serverCanEnd;
+    }
+    if (handovers.isEmpty) {
+      return true;
+    }
+    return handovers.every(
+      (handover) =>
+          handover.handoverStatus == HandoverStatus.accepted ||
+          (handover.handoverStatus == HandoverStatus.pending &&
+              handover.isDocumentedPending),
+    );
+  }
 
   @override
   State<EndManagerShiftScreen> createState() => _EndManagerShiftScreenState();
@@ -61,6 +82,10 @@ class _EndManagerShiftScreenState extends State<EndManagerShiftScreen> {
   }
 
   void _onBackButtonPressed(BuildContext context, int currentIndex) {
+    if (context.read<EndAndUpdateManagerShiftCubit>().state
+        is EndManagerShiftButtonLoading) {
+      return;
+    }
     _goBackView(context);
 
     switch (currentIndex) {
@@ -76,17 +101,17 @@ class _EndManagerShiftScreenState extends State<EndManagerShiftScreen> {
   }
 
   void _onNextButtonPressed(BuildContext context, int currentIndex) {
-    _changeView(context);
     if (currentIndex == 2) {
       final cubit = context.read<FinalDailyCloseCubit>();
-      final totals = cubit.totals;
+      final snapshot = cubit.state;
+      if (snapshot is! FinalDailyCloseLoadedOrUpdated || !snapshot.canSubmit) {
+        return;
+      }
       context.read<EndAndUpdateManagerShiftCubit>().endManagerShift(
-        aggregatorPayments: totals.totalDeliveryApps,
-        cardPayments: totals.totalCardPayments,
-        cashCollected: totals.totalCashCollected,
-        totalSales: totals.totalSales,
-        cashierBreakdown: cubit.cashiersBreakdown,
+        workday: snapshot,
       );
+    } else {
+      _changeView(context);
     }
   }
 
@@ -179,16 +204,10 @@ class _EndManagerShiftScreenState extends State<EndManagerShiftScreen> {
                               child: BlocSelector<ValidationCubit, ValidationState, bool>(
                                 selector: (state) {
                                   if (currentIndex == 0) {
-                                    final areAllHandoversCompleted =
-                                        widget.handovers.isEmpty
-                                        ? false
-                                        : widget.handovers.every(
-                                            (handover) =>
-                                                handover.handoverStatus ==
-                                                HandoverStatus.accepted,
-                                          );
-
-                                    return areAllHandoversCompleted;
+                                    return EndManagerShiftScreen.canProceedFromHandovers(
+                                      widget.handovers,
+                                      serverCanEnd: widget.serverCanEnd,
+                                    );
                                   } else if (currentIndex == 1) {
                                     return context
                                             .read<ValidationCubit>()
@@ -225,7 +244,7 @@ class _EndManagerShiftScreenState extends State<EndManagerShiftScreen> {
                                                     .businessDateClosed,
                                                 subTitle: context.tr
                                                     .yourFinalHandoverHasBeenSubmittedForReview(
-                                                      'Accountant Name',
+                                                      S.current.accountantName,
                                                     ),
                                                 managerShift: managerShiftState
                                                     .managerShift,
@@ -240,15 +259,27 @@ class _EndManagerShiftScreenState extends State<EndManagerShiftScreen> {
                                           is EndManagerShiftButtonLoading) {
                                         return const AppButtonLoading();
                                       }
-                                      return AppButton(
-                                        onClick: () => _onNextButtonPressed(
-                                          context,
-                                          currentIndex,
+                                      return BlocBuilder<
+                                        FinalDailyCloseCubit,
+                                        FinalDailyCloseState
+                                      >(
+                                        builder: (context, dailyState) => AppButton(
+                                          onClick: () => _onNextButtonPressed(
+                                            context,
+                                            currentIndex,
+                                          ),
+                                          enabled:
+                                              enableButton &&
+                                              (currentIndex == 0 ||
+                                                  (dailyState
+                                                          is FinalDailyCloseLoadedOrUpdated &&
+                                                      (currentIndex != 2 ||
+                                                          dailyState
+                                                              .canSubmit))),
+                                          text: currentIndex == 2
+                                              ? context.tr.end_shift
+                                              : context.tr.next,
                                         ),
-                                        enabled: enableButton,
-                                        text: currentIndex == 2
-                                            ? context.tr.end_shift
-                                            : context.tr.next,
                                       );
                                     },
                                   );
